@@ -1,0 +1,5 @@
+/* src/app/globals.css */
+@import "tailwindcss";
+
+/* màu header xanh đậm giống Skyscanner */
+:root { --header: #1b436e; }

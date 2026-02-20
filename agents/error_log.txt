@@ -1,0 +1,14 @@
+Caught error: object NoneType can't be used in 'await' expression
+Traceback (most recent call last):
+  File "C:\Users\Chinh\Documents\GitHub\test2\agents\reproduce_issue.py", line 40, in reproduce
+    async for chunk in agent.stream_response(session_id, user_id, content, context):
+        print(f"Received chunk: {chunk}")
+  File "C:\Users\Chinh\Documents\GitHub\test2\agents\aggregate\agent.py", line 95, in stream_response
+    self._graph = await self._create_workflow_graph()
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Chinh\Documents\GitHub\test2\agents\aggregate\agent.py", line 54, in _create_workflow_graph
+    raise e
+  File "C:\Users\Chinh\Documents\GitHub\test2\agents\aggregate\agent.py", line 44, in _create_workflow_graph
+    connection_pool = await self._get_connection_pool()
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: object NoneType can't be used in 'await' expression
