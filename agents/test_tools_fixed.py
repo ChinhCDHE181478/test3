@@ -17,9 +17,10 @@ async def test_plan_itinerary():
     config: RunnableConfig = {"configurable": {"thread_id": "test"}}
     
     try:
-        # This will call chain.ainvoke inside plan_itinerary
-        # If config is passed correctly, it should NOT raise get_config error
-        result = await plan_itinerary(state=state, config=config)
+        # Pass the arguments in a dictionary to ainvoke
+        result = await plan_itinerary.ainvoke(
+            {"state": state, "config": config}
+        )
         print(f"Tool Result: {result}")
     except Exception as e:
         print(f"Caught error: {e}")
