@@ -193,7 +193,7 @@ Return ONLY a valid JSON object. Do not wrap in code fences or tags.
     conv_messages = _filter_conversation_messages(state["messages"])
     search_criteria: HotelSearchCriteria = await chain.ainvoke(
         {"messages": conv_messages},
-        config=config
+        config=config or {"configurable": {}}
     )
 
     errors = _validate_search_criteria(search_criteria)
@@ -282,7 +282,7 @@ Return ONLY a valid JSON object. Do not wrap in code fences or tags.
     conv_messages = _filter_conversation_messages(state["messages"])
     multi_criteria: MultiHotelSearchCriteria = await chain.ainvoke(
         {"messages": conv_messages},
-        config=config
+        config=config or {"configurable": {}}
     )
 
     invalid_segments: list[str] = []

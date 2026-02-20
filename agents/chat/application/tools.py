@@ -26,11 +26,10 @@ tavily_instance = TavilySearch(
     tavily_api_key=settings.TAVILY_API_KEY,
 )
 
-search_tool = StructuredTool.from_function(
-    func=tavily_instance.invoke,
-    name="tavily_search",
-    description="A search engine optimized for comprehensive, accurate, and trusted results. Useful for when you need to answer questions about current events.",
-)
+@tool("tavily_search")
+def search_tool(query: str, config: RunnableConfig = None):
+    """A search engine optimized for comprehensive, accurate, and trusted results. Useful for when you need to answer questions about current events."""
+    return tavily_instance.invoke(query, config=config)
 
 search_places_tool = SearchPlacesTool(api_key=settings.SERPAPI_API_KEY)
 
@@ -107,7 +106,10 @@ Return ONLY a valid JSON object. Do not wrap in code fences or tags.
     chain = prompt | extract_llm | parser
 
     conv_messages = _filter_conversation_messages(state["messages"])
-    plan: Plan = await chain.ainvoke({"messages": conv_messages}, config=config)
+    plan: Plan = await chain.ainvoke(
+        {"messages": conv_messages},
+        config=config or {"configurable": {}}
+    )
 
     return Command(
         goto="plan_agent",

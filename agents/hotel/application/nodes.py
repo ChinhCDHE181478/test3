@@ -60,7 +60,7 @@ async def search_hotels_node(
 
     chain = prompt | structured_llm
 
-    dest_query = await chain.ainvoke({}, config=config)
+    dest_query = await chain.ainvoke({}, config=config or {"configurable": {}})
 
     try:
         destination_info = await booking_api.search_destination(
@@ -183,7 +183,7 @@ async def rank_hotels_node(
 
     response = {}
     try:
-        async for chunk in chain.astream({}, config=config):
+        async for chunk in chain.astream({}, config=config or {"configurable": {}}):
             stream_writer(
                 {
                     "data-hotel": {
@@ -205,7 +205,7 @@ async def rank_hotels_node(
             f"rank_hotels_node streaming error: {str(e)} — falling back to non-streaming invoke"
         )
         try:
-            response = await chain.ainvoke({}, config=config)
+            response = await chain.ainvoke({}, config=config or {"configurable": {}})
         except Exception as ee:
             logger.error(f"rank_hotels_node fallback invoke failed: {str(ee)}")
             empty_recommendation = HotelRecommendation(
@@ -317,7 +317,7 @@ async def _rank_for_segment(
         format_instructions=parser.get_format_instructions(),
     )
     chain = prompt | planning_llm | parser
-    response = await chain.ainvoke({}, config=config)
+    response = await chain.ainvoke({}, config=config or {"configurable": {}})
     recommendation = HotelRecommendation(**response)
     
     # Enrich each recommended hotel with full details and booking link
@@ -369,7 +369,7 @@ async def multi_segment_hotels_node(
             destination=criteria.destination,
             language=language,
         )
-        dest = await (prompt | structured_llm).ainvoke({}, config=config)
+        dest = await (prompt | structured_llm).ainvoke({}, config=config or {"configurable": {}})
 
         destination_info = await booking_api.search_destination(
             query=dest.destination,  # type:ignore

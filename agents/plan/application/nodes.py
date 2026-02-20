@@ -63,7 +63,7 @@ async def create_itinerary_node(
         {
             "plan": plan.model_dump_json(),
         },
-        config=config,
+        config=config or {"configurable": {}},
     ):
         stream_writer(
             {
@@ -120,7 +120,7 @@ You must response in {language}
         {
             "destinations": destinations,
         },
-        config=config,
+        config=config or {"configurable": {}},
     )
 
     try:
@@ -199,7 +199,7 @@ Respond in {language}.
         {
             "destinations": destinations,
         },
-        config=config,
+        config=config or {"configurable": {}},
     )
 
     try:

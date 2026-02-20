@@ -1,5 +1,7 @@
 from typing import Any, AsyncIterator, Dict, Optional, Sequence, Tuple
 from uuid import uuid4
+import traceback
+from loguru import logger
 
 from dataclasses import dataclass
 
@@ -64,6 +66,9 @@ class StreamResponse:
                             yield part
 
         except Exception as e:
+            error_trace = traceback.format_exc()
+            print(f"!!! Stream error: {e}")
+            print(error_trace)
             yield DataStreamErrorPart(error=str(e)).format()
         finally:
             if self._message_started:

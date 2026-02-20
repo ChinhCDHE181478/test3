@@ -1,4 +1,5 @@
 from typing import Annotated, Any, Optional, Dict, Sequence
+from langchain_core.runnables import RunnableConfig
 from fastapi import Depends
 from loguru import logger
 from langchain_core.prompts import ChatPromptTemplate
@@ -72,9 +73,10 @@ class UserConversationService:
         user_id: str,
         session_id: str,
         content: str,
+        config: RunnableConfig = None,
     ) -> UserConversation:
         try:
-            title = await self.generate_title_from_user_message(content)
+            title = await self.generate_title_from_user_message(content, config=config)
 
             user_conversation = UserConversation(
                 user_id=int(user_id),
@@ -91,7 +93,9 @@ class UserConversationService:
                 f"Error creating conversation for user: {user_id}"
             ) from e
 
-    async def generate_title_from_user_message(self, message: str):
+    async def generate_title_from_user_message(
+        self, message: str, config: RunnableConfig = None
+    ):
         prompt = ChatPromptTemplate.from_messages(
             [
                 (
@@ -112,6 +116,6 @@ class UserConversationService:
 
         chain = prompt | llm
 
-        response = await chain.ainvoke({"message": message})
+        response = await chain.ainvoke({"message": message}, config=config)
 
         return str(response.content)

@@ -50,10 +50,12 @@ async def response(
             session_id=conversation_req.session_id,
         )
         if not user_conversation:
+            config = {"configurable": {"thread_id": conversation_req.session_id, "user_id": conversation_req.user_id}}
             await user_conversation_service.create_user_conversation(
                 user_id=conversation_req.user_id,
                 session_id=conversation_req.session_id,
                 content=conversation_req.content,
+                config=config,
             )
 
         result = await agent.response(
@@ -92,10 +94,12 @@ async def stream(
             session_id=conversation_req.session_id,
         )
         if not user_conversation:
+            config = {"configurable": {"thread_id": conversation_req.session_id, "user_id": conversation_req.user_id}}
             await user_conversation_service.create_user_conversation(
                 user_id=conversation_req.user_id,
                 session_id=conversation_req.session_id,
                 content=conversation_req.content,
+                config=config,
             )
 
         return AgentStreamingResponse(
