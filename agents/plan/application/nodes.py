@@ -7,6 +7,7 @@ from langgraph.runtime import Runtime
 from loguru import logger
 from pydantic import BaseModel, Field
 
+from langchain_core.messages import AIMessage
 from plan.application.tools import transfer_to_chatbot
 from shared.runtime import ContextSchema
 from shared.infrastructure.llm import planning_llm, llm
@@ -140,11 +141,22 @@ You must response in {language}
 async def transfer_node(
     state: PlanAgentState, config: RunnableConfig
 ) -> PlanAgentState:
-    llm_with_tools = llm.bind_tools(
-        [transfer_to_chatbot], tool_choice="transfer_to_chatbot"
-    )
+    import uuid
 
-    response = await llm_with_tools.ainvoke("Transfer to Chatbot", config=config)
+    # Bypassing LLM call to avoid "Tool choice is required" error on some models (like Groq)
+    # Since this node is strictly for handoff, we can just return a static tool call message.
+    tool_call_id = f"call_{uuid.uuid4().hex}"
+    response = AIMessage(
+        content="",
+        tool_calls=[
+            {
+                "name": "transfer_to_chatbot",
+                "args": {},
+                "id": tool_call_id,
+                "type": "tool_call",
+            }
+        ],
+    )
 
     return {"messages": [response]}
 

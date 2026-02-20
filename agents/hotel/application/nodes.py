@@ -6,6 +6,7 @@ from langchain_core.prompts import ChatPromptTemplate
 from langgraph.config import get_stream_writer
 from langgraph.runtime import Runtime
 from langgraph.types import Command
+from langchain_core.messages import AIMessage
 from loguru import logger
 from pydantic import BaseModel, Field
 
@@ -242,11 +243,22 @@ async def transfer_node(
     state: HotelAgentState,
     config: RunnableConfig,
 ) -> HotelAgentState:
-    llm_with_tools = llm.bind_tools(
-        [transfer_to_chatbot], tool_choice="transfer_to_chatbot"
-    )
+    import uuid
 
-    response = await llm_with_tools.ainvoke("Transfer to Chatbot", config=config)
+    # Bypassing LLM call to avoid "Tool choice is required" error on some models (like Groq)
+    # Since this node is strictly for handoff, we can just return a static tool call message.
+    tool_call_id = f"call_{uuid.uuid4().hex}"
+    response = AIMessage(
+        content="",
+        tool_calls=[
+            {
+                "name": "transfer_to_chatbot",
+                "args": {},
+                "id": tool_call_id,
+                "type": "tool_call",
+            }
+        ],
+    )
 
     return {**state, "messages": [response]}
 
