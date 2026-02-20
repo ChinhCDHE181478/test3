@@ -7,6 +7,7 @@ from langchain_core.tools import InjectedToolCallId, tool
 from langchain_core.output_parsers import PydanticOutputParser
 from langgraph.prebuilt import InjectedState
 from langgraph.types import Command
+from langchain_core.runnables import RunnableConfig
 from langchain_core.messages import BaseMessage, HumanMessage, AIMessage
 
 from shared.infrastructure.llm import extract_llm
