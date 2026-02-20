@@ -71,7 +71,7 @@ class Agent:
                 subgraphs=True,
                 context=context,  # type:ignore
             ),
-            messages_streamable_nodes=["agent"],
+            messages_streamable_nodes=["chatbot", "plan_agent", "hotel_agent"],
             custom_data_stream_config=[
                 CustomDataStreamConfig(
                     key="data-itinerary",

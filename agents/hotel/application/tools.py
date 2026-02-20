@@ -191,9 +191,12 @@ Return ONLY a valid JSON object. Do not wrap in code fences or tags.
     chain = prompt | extract_llm | parser
 
     conv_messages = _filter_conversation_messages(state["messages"])
+    if config is None:
+        from loguru import logger
+        logger.warning("recommend_hotels: config is None, command might fail")
     search_criteria: HotelSearchCriteria = await chain.ainvoke(
         {"messages": conv_messages},
-        config=config or {"configurable": {}}
+        config=config
     )
 
     errors = _validate_search_criteria(search_criteria)
@@ -280,9 +283,12 @@ Return ONLY a valid JSON object. Do not wrap in code fences or tags.
     chain = prompt | extract_llm | parser
 
     conv_messages = _filter_conversation_messages(state["messages"])
+    if config is None:
+        from loguru import logger
+        logger.warning("recommend_hotels_multi: config is None, command might fail")
     multi_criteria: MultiHotelSearchCriteria = await chain.ainvoke(
         {"messages": conv_messages},
-        config=config or {"configurable": {}}
+        config=config
     )
 
     invalid_segments: list[str] = []

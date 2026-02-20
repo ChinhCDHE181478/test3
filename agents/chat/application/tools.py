@@ -61,7 +61,9 @@ async def search_for_places(
         list[Place]: A list of places.
     """
     language = language or (state.get("language") if state else "vi")
-
+    if config is None:
+        from loguru import logger
+        logger.warning("search_for_places: config is None")
     return await search_places_tool.search_for_places(queries, language)
 
 search_for_places.name = "search_for_places"
@@ -106,10 +108,10 @@ Return ONLY a valid JSON object. Do not wrap in code fences or tags.
     chain = prompt | extract_llm | parser
 
     conv_messages = _filter_conversation_messages(state["messages"])
-    plan: Plan = await chain.ainvoke(
-        {"messages": conv_messages},
-        config=config or {"configurable": {}}
-    )
+    if config is None:
+        from loguru import logger
+        logger.warning("plan_itinerary: config is None, command might fail")
+    plan: Plan = await chain.ainvoke({"messages": conv_messages}, config=config)
 
     return Command(
         goto="plan_agent",
