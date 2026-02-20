@@ -128,9 +128,9 @@ transfer_to_chatbot.description = "Transfer control back to the chatbot with hot
 
 @tool(return_direct=True)
 async def recommend_hotels(
-    language: str,
     state: Annotated[dict, InjectedState],
     tool_call_id: Annotated[str, InjectedToolCallId],
+    language: str = "vi",
 ) -> Command[Literal["hotel_agent", "chat_node"]]:
     """
     Extract hotel search criteria from summary and messages then transfer to Hotel Agent to search and recommend hotels.
@@ -166,6 +166,7 @@ Return ONLY a valid JSON object. Do not wrap in code fences or tags.
 \nResponse in {language} language.
 \nCurrent date is {current_date}. Please consider this when extracting dates, you can assume the year is {current_year} or next year if date has passed.
 \nSummary of the conversation so far (if any):\n{summary}"""
+    # language is now guaranteed from signature default
     system_prompt = system_prompt.format(
         format_instructions=parser.get_format_instructions(),
         language=language,
@@ -234,9 +235,9 @@ recommend_hotels.description = "Extract hotel search criteria from summary and m
 
 @tool
 async def recommend_hotels_multi(
-    language: str,
     state: Annotated[dict, InjectedState],
     tool_call_id: Annotated[str, InjectedToolCallId],
+    language: str = "vi",
 ) -> Command[Literal["hotel_agent", "chat_node"]]:
     """
     Extract multiple hotel search segments from the conversation and transfer to Hotel Agent.
@@ -253,6 +254,7 @@ Return ONLY a valid JSON object. Do not wrap in code fences or tags.
 \nResponse in {language} language.
 \nCurrent date is {current_date}. Please consider this when extracting dates, you can assume the year is {current_year} or next year if date has passed.
 \nSummary of the conversation so far (if any):\n{summary}"""
+    # language is now guaranteed from signature default
     system_prompt = system_prompt.format(
         format_instructions=parser.get_format_instructions(),
         language=language,

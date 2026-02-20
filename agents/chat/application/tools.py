@@ -39,13 +39,13 @@ def _filter_conversation_messages(messages: list[BaseMessage]) -> list[BaseMessa
     return filtered
 
 @tool(parse_docstring=True)
-async def search_for_places(queries: list[str], language: str = "en") -> list[Place]:
+async def search_for_places(queries: list[str], language: str = "vi") -> list[Place]:
     """
     Search for places based on queries, language, returns a list of places including their name, address, and coordinates.
 
     Args:
         queries (list[str]): A list of queries to search for places.
-        language (str, optional): The language to search in. Defaults to "en".
+        language (str, optional): The language to search in. Defaults to "vi".
 
     Returns:
         list[Place]: A list of places.
@@ -59,9 +59,9 @@ search_for_places.description = "Search for places based on queries, language, r
 
 @tool
 async def plan_itinerary(
-    language: str,
     state: Annotated[dict, InjectedState],
     tool_call_id: Annotated[str, InjectedToolCallId],
+    language: str = "vi",
 ) -> Command[Literal["plan_agent", "chat_node"]]:
     """
     Extract the plan details from summary and messages then transfer to Plan Agent to create an itinerary.
@@ -76,6 +76,7 @@ Return ONLY a valid JSON object. Do not wrap in code fences or tags.
 \nResponse in {language} language.
 \nAlways refer to current year if the user doesn't specify the year. current datetime: {current_datetime}
 \nSummary of the conversation so far (if any):\n{summary}"""
+    # language is now guaranteed to have a value from the signature default
     system_prompt = system_prompt.format(
         format_instructions=parser.get_format_instructions(),
         language=language,
