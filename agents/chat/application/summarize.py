@@ -11,6 +11,7 @@ from langgraph.graph.message import REMOVE_ALL_MESSAGES
 
 from chat.application.state import ChatbotState
 from shared.infrastructure.config.settings import settings
+from shared.utils.language import detect_language
 
 
 class SummarizeTool:
@@ -112,8 +113,13 @@ Only return the updated summary. DO NOT add explanations, section headers, or ex
 
     async def summarize(self, state: ChatbotState, config: RunnableConfig):
         """Summarize the messages conversation between human and chatbot"""
+        latest_human_msg = next((m for m in reversed(state["messages"]) if isinstance(m, HumanMessage)), None)
+        updates = {}
+        if latest_human_msg:
+            updates["language"] = detect_language(latest_human_msg.content)
+
         if not self._should_summarize_conversation(state):
-            return {"messages": state["messages"]}
+            return updates
 
         existing_summary = state.get("summary")
         summary_prompt = self._create_summary_prompt(existing_summary)
@@ -132,6 +138,7 @@ Only return the updated summary. DO NOT add explanations, section headers, or ex
         updated_messages = state["messages"][-settings.TOTAL_MESSAGES_AFTER_SUMMARY :]
 
         return {
+            **updates,
             "summary": response.content,
             "messages": [RemoveMessage(id=REMOVE_ALL_MESSAGES), *updated_messages],
         }

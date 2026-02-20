@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Literal, Annotated
+from typing import Literal, Annotated, Optional
 
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.messages import SystemMessage
@@ -38,18 +38,23 @@ def _filter_conversation_messages(messages: list[BaseMessage]) -> list[BaseMessa
             filtered.append(m)
     return filtered
 
-@tool(parse_docstring=True)
-async def search_for_places(queries: list[str], language: str = "vi") -> list[Place]:
+@tool("search_for_places", parse_docstring=True)
+async def search_for_places(
+    queries: list[str],
+    language: Optional[str] = None,
+    state: Annotated[dict, InjectedState] = None,
+) -> list[Place]:
     """
     Search for places based on queries, language, returns a list of places including their name, address, and coordinates.
 
     Args:
         queries (list[str]): A list of queries to search for places.
-        language (str, optional): The language to search in. Defaults to "vi".
+        language (str, optional): The language to search in.
 
     Returns:
         list[Place]: A list of places.
     """
+    language = language or state.get("language", "vi")
 
     return await search_places_tool.search_for_places(queries, language)
 
@@ -57,11 +62,11 @@ search_for_places.name = "search_for_places"
 search_for_places.description = "Search for places based on queries, language, returns a list of places including their name, address, and coordinates."
 
 
-@tool
+@tool("plan_itinerary")
 async def plan_itinerary(
-    state: Annotated[dict, InjectedState],
-    tool_call_id: Annotated[str, InjectedToolCallId],
-    language: str = "vi",
+    language: Optional[str] = None,
+    state: Annotated[dict, InjectedState] = None,
+    tool_call_id: Annotated[str, InjectedToolCallId] = None,
 ) -> Command[Literal["plan_agent", "chat_node"]]:
     """
     Extract the plan details from summary and messages then transfer to Plan Agent to create an itinerary.
@@ -76,7 +81,7 @@ Return ONLY a valid JSON object. Do not wrap in code fences or tags.
 \nResponse in {language} language.
 \nAlways refer to current year if the user doesn't specify the year. current datetime: {current_datetime}
 \nSummary of the conversation so far (if any):\n{summary}"""
-    # language is now guaranteed to have a value from the signature default
+    language = language or state.get("language", "vi")
     system_prompt = system_prompt.format(
         format_instructions=parser.get_format_instructions(),
         language=language,

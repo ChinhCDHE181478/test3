@@ -5,10 +5,10 @@ from langgraph.prebuilt import InjectedState
 from langgraph.types import Command
 
 
-@tool
+@tool("transfer_to_chatbot")
 def transfer_to_chatbot(
-    state: Annotated[dict, InjectedState],
-    tool_call_id: Annotated[str, InjectedToolCallId],
+    state: Annotated[dict, InjectedState] = None,
+    tool_call_id: Annotated[str, InjectedToolCallId] = None,
 ) -> Command[Literal["chatbot"]]:
     """Transfer the itinerary to Chatbot"""
     itinerary = state["itinerary"]

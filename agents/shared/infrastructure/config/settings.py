@@ -18,6 +18,7 @@ class Settings(BaseSettings):
     MODEL_NAME: str = os.getenv("MODEL_NAME", "")
     MODEL_MAX_TOKENS: int = int(os.getenv("MODEL_MAX_TOKENS", 4096))
     MODEL_TEMPERATURE: float = float(os.getenv("MODEL_TEMPERATURE", 0.1))
+    GROQ_API_KEY: str | None = os.getenv("GROQ_API_KEY")
 
     PLANNING_MODEL_NAME: str = os.getenv("PLANNING_MODEL_NAME", "")
     PLANNING_MODEL_MAX_TOKENS: int = int(os.getenv("PLANNING_MODEL_MAX_TOKENS", 16384))

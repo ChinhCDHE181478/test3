@@ -624,8 +624,8 @@ function VivuplanPremiumContent() {
 
         <div className="relative flex-1 overflow-hidden flex flex-col">
           {shouldLockContent && <BlurLockLayer />}
-          <div className={`flex-1 flex flex-col overflow-hidden ${shouldLockContent ? "pointer-events-none" : ""}`}>
-            <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 md:p-8 space-y-6 custom-scrollbar">
+          <div className="flex-1 flex flex-col overflow-hidden">
+            <div ref={scrollRef} className={`flex-1 overflow-y-auto p-4 md:p-8 space-y-6 custom-scrollbar ${shouldLockContent ? "pointer-events-none" : ""}`}>
               {messages.length === 0 && !isLoading ? (
                 <div className="h-full flex flex-col items-center justify-center text-center space-y-6 max-w-md mx-auto py-10"><div className="w-16 h-16 bg-blue-50 rounded-[2rem] flex items-center justify-center text-[#0056D2] animate-bounce shadow-lg shadow-blue-50"><Sparkles size={32} /></div><h2 className="text-xl md:text-2xl font-black italic tracking-tighter uppercase mb-2 text-[#0056D2]">Xin chào!</h2><div className="grid grid-cols-1 md:grid-cols-2 gap-2 w-full px-4">{["Đà Lạt 3N2Đ", "Huế ăn gì?", "Resort Nha Trang"].map((t, i) => (<button key={i} onClick={() => setInputText(t)} className="p-3 border border-slate-100 rounded-xl text-[10px] font-black uppercase tracking-widest text-slate-500 hover:bg-blue-50 hover:text-[#0056D2] hover:border-blue-100 transition-all text-left">{t}</button>))}</div></div>
               ) : (
@@ -658,32 +658,78 @@ function VivuplanPremiumContent() {
                       </div>
 
                       {quickMode === "itinerary" ? (
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                          <input value={itineraryForm.departure} onChange={(e) => setItineraryForm({ ...itineraryForm, departure: e.target.value })} className="w-full bg-slate-50 border-none rounded-lg px-3 py-2 text-xs font-bold" placeholder="Điểm xuất phát?" />
-                          <input value={itineraryForm.destination} onChange={(e) => setItineraryForm({ ...itineraryForm, destination: e.target.value })} className="w-full bg-slate-50 border-none rounded-lg px-3 py-2 text-xs font-bold" placeholder="Điểm đến?" />
-                          <div className="flex gap-2">
-                            <input type="text" onFocus={(e) => e.target.type = 'date'} onBlur={(e) => e.target.type = 'text'} value={itineraryForm.startDate} onChange={(e) => setItineraryForm({ ...itineraryForm, startDate: e.target.value })} className="w-full bg-slate-50 border-none rounded-lg px-3 py-2 text-xs font-bold" placeholder="Ngày đi" />
-                            <input type="text" onFocus={(e) => e.target.type = 'date'} onBlur={(e) => e.target.type = 'text'} value={itineraryForm.endDate} onChange={(e) => setItineraryForm({ ...itineraryForm, endDate: e.target.value })} className="w-full bg-slate-50 border-none rounded-lg px-3 py-2 text-xs font-bold" placeholder="Ngày về" />
+                        <div className="space-y-4">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <div className="space-y-1">
+                              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Điểm xuất phát</label>
+                              <input value={itineraryForm.departure} onChange={(e) => setItineraryForm({ ...itineraryForm, departure: e.target.value })} className="w-full bg-slate-50 border-none rounded-lg px-3 py-2 text-xs font-bold" placeholder="VD: Hà Nội" />
+                            </div>
+                            <div className="space-y-1">
+                              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Điểm đến</label>
+                              <input value={itineraryForm.destination} onChange={(e) => setItineraryForm({ ...itineraryForm, destination: e.target.value })} className="w-full bg-slate-50 border-none rounded-lg px-3 py-2 text-xs font-bold" placeholder="VD: Đà Lạt" />
+                            </div>
                           </div>
 
-                          <input type="text" inputMode="numeric" value={itineraryForm.companions} onChange={(e) => setItineraryForm({ ...itineraryForm, companions: e.target.value.replace(/[^0-9]/g, "") })} className="w-full bg-slate-50 border-none rounded-lg px-3 py-2 text-xs font-bold" placeholder="Số người?" />
-                          <div className="flex gap-2 md:col-span-2">
-                            <input type="text" inputMode="numeric" value={itineraryForm.budgetFrom} onChange={(e) => setItineraryForm({ ...itineraryForm, budgetFrom: e.target.value.replace(/[^0-9]/g, "") })} className="w-full bg-slate-50 border-none rounded-lg px-3 py-2 text-xs font-bold" placeholder="Ngân sách từ..." />
-                            <input type="text" inputMode="numeric" value={itineraryForm.budgetTo} onChange={(e) => setItineraryForm({ ...itineraryForm, budgetTo: e.target.value.replace(/[^0-9]/g, "") })} className="w-full bg-slate-50 border-none rounded-lg px-3 py-2 text-xs font-bold" placeholder="...đến (VND)" />
+                          <div className="grid grid-cols-2 gap-3">
+                            <div className="space-y-1">
+                              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Ngày đi</label>
+                              <input type="date" value={itineraryForm.startDate} onChange={(e) => setItineraryForm({ ...itineraryForm, startDate: e.target.value })} className="w-full bg-slate-50 border-none rounded-lg px-3 py-2 text-xs font-bold" />
+                            </div>
+                            <div className="space-y-1">
+                              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Ngày về</label>
+                              <input type="date" value={itineraryForm.endDate} onChange={(e) => setItineraryForm({ ...itineraryForm, endDate: e.target.value })} className="w-full bg-slate-50 border-none rounded-lg px-3 py-2 text-xs font-bold" />
+                            </div>
+                          </div>
+
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Số người tham gia</label>
+                            <input type="text" inputMode="numeric" value={itineraryForm.companions} onChange={(e) => setItineraryForm({ ...itineraryForm, companions: e.target.value.replace(/[^0-9]/g, "") })} className="w-full bg-slate-50 border-none rounded-lg px-3 py-2 text-xs font-bold" placeholder="Nhập số người" />
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-3">
+                            <div className="space-y-1">
+                              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Ngân sách từ</label>
+                              <input type="text" inputMode="numeric" value={itineraryForm.budgetFrom} onChange={(e) => setItineraryForm({ ...itineraryForm, budgetFrom: e.target.value.replace(/[^0-9]/g, "") })} className="w-full bg-slate-50 border-none rounded-lg px-3 py-2 text-xs font-bold" placeholder="VND" />
+                            </div>
+                            <div className="space-y-1">
+                              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Đến</label>
+                              <input type="text" inputMode="numeric" value={itineraryForm.budgetTo} onChange={(e) => setItineraryForm({ ...itineraryForm, budgetTo: e.target.value.replace(/[^0-9]/g, "") })} className="w-full bg-slate-50 border-none rounded-lg px-3 py-2 text-xs font-bold" placeholder="VND" />
+                            </div>
                           </div>
                         </div>
                       ) : (
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                          <input value={hotelForm.destination} onChange={(e) => setHotelForm({ ...hotelForm, destination: e.target.value })} className="w-full bg-slate-50 border-none rounded-lg px-3 py-2 text-xs font-bold md:col-span-2" placeholder="Thành phố / Khu vực?" />
-                          <div className="flex gap-2">
-                            <input type="text" onFocus={(e) => e.target.type = 'date'} onBlur={(e) => e.target.type = 'text'} value={hotelForm.checkIn} onChange={(e) => setHotelForm({ ...hotelForm, checkIn: e.target.value })} className="w-full bg-slate-50 border-none rounded-lg px-3 py-2 text-xs font-bold" placeholder="Check-in" />
-                            <input type="text" onFocus={(e) => e.target.type = 'date'} onBlur={(e) => e.target.type = 'text'} value={hotelForm.checkOut} onChange={(e) => setHotelForm({ ...hotelForm, checkOut: e.target.value })} className="w-full bg-slate-50 border-none rounded-lg px-3 py-2 text-xs font-bold" placeholder="Check-out" />
+                        <div className="space-y-4">
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Thành phố / Khu vực</label>
+                            <input value={hotelForm.destination} onChange={(e) => setHotelForm({ ...hotelForm, destination: e.target.value })} className="w-full bg-slate-50 border-none rounded-lg px-3 py-2 text-xs font-bold" placeholder="VD: Đà Lạt" />
                           </div>
-                          <div className="flex gap-2">
-                            <input type="text" inputMode="numeric" value={hotelForm.adults} onChange={(e) => setHotelForm({ ...hotelForm, adults: e.target.value.replace(/[^0-9]/g, "") })} className="w-full bg-slate-50 border-none rounded-lg px-3 py-2 text-xs font-bold" placeholder="Người lớn" />
-                            <input type="text" inputMode="numeric" value={hotelForm.children} onChange={(e) => setHotelForm({ ...hotelForm, children: e.target.value.replace(/[^0-9]/g, "") })} className="w-full bg-slate-50 border-none rounded-lg px-3 py-2 text-xs font-bold" placeholder="Trẻ em" />
+
+                          <div className="grid grid-cols-2 gap-3">
+                            <div className="space-y-1">
+                              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Check-in</label>
+                              <input type="date" value={hotelForm.checkIn} onChange={(e) => setHotelForm({ ...hotelForm, checkIn: e.target.value })} className="w-full bg-slate-50 border-none rounded-lg px-3 py-2 text-xs font-bold" />
+                            </div>
+                            <div className="space-y-1">
+                              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Check-out</label>
+                              <input type="date" value={hotelForm.checkOut} onChange={(e) => setHotelForm({ ...hotelForm, checkOut: e.target.value })} className="w-full bg-slate-50 border-none rounded-lg px-3 py-2 text-xs font-bold" />
+                            </div>
                           </div>
-                          <input type="text" inputMode="numeric" value={hotelForm.rooms} onChange={(e) => setHotelForm({ ...hotelForm, rooms: e.target.value.replace(/[^0-9]/g, "") })} className="w-full bg-slate-50 border-none rounded-lg px-3 py-2 text-xs font-bold md:col-span-2" placeholder="Số phòng?" />
+
+                          <div className="grid grid-cols-2 gap-3">
+                            <div className="space-y-1">
+                              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Người lớn</label>
+                              <input type="text" inputMode="numeric" value={hotelForm.adults} onChange={(e) => setHotelForm({ ...hotelForm, adults: e.target.value.replace(/[^0-9]/g, "") })} className="w-full bg-slate-50 border-none rounded-lg px-3 py-2 text-xs font-bold" />
+                            </div>
+                            <div className="space-y-1">
+                              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Trẻ em</label>
+                              <input type="text" inputMode="numeric" value={hotelForm.children} onChange={(e) => setHotelForm({ ...hotelForm, children: e.target.value.replace(/[^0-9]/g, "") })} className="w-full bg-slate-50 border-none rounded-lg px-3 py-2 text-xs font-bold" />
+                            </div>
+                          </div>
+
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Số phòng</label>
+                            <input type="text" inputMode="numeric" value={hotelForm.rooms} onChange={(e) => setHotelForm({ ...hotelForm, rooms: e.target.value.replace(/[^0-9]/g, "") })} className="w-full bg-slate-50 border-none rounded-lg px-3 py-2 text-xs font-bold" placeholder="Nhập số phòng" />
+                          </div>
                         </div>
                       )}
 

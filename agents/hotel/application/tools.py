@@ -1,4 +1,4 @@
-from typing import Annotated, Literal
+from typing import Annotated, Literal, Optional
 from datetime import datetime
 
 from langchain_core.messages import ToolMessage, SystemMessage
@@ -126,11 +126,11 @@ transfer_to_chatbot.name = "transfer_to_chatbot"
 transfer_to_chatbot.description = "Transfer control back to the chatbot with hotel recommendations or validation guidance."
 
 
-@tool(return_direct=True)
+@tool("recommend_hotels", return_direct=True)
 async def recommend_hotels(
-    state: Annotated[dict, InjectedState],
-    tool_call_id: Annotated[str, InjectedToolCallId],
-    language: str = "vi",
+    language: Optional[str] = None,
+    state: Annotated[dict, InjectedState] = None,
+    tool_call_id: Annotated[str, InjectedToolCallId] = None,
 ) -> Command[Literal["hotel_agent", "chat_node"]]:
     """
     Extract hotel search criteria from summary and messages then transfer to Hotel Agent to search and recommend hotels.
@@ -166,7 +166,7 @@ Return ONLY a valid JSON object. Do not wrap in code fences or tags.
 \nResponse in {language} language.
 \nCurrent date is {current_date}. Please consider this when extracting dates, you can assume the year is {current_year} or next year if date has passed.
 \nSummary of the conversation so far (if any):\n{summary}"""
-    # language is now guaranteed from signature default
+    language = language or state.get("language", "vi")
     system_prompt = system_prompt.format(
         format_instructions=parser.get_format_instructions(),
         language=language,
@@ -233,11 +233,11 @@ recommend_hotels.name = "recommend_hotels"
 recommend_hotels.description = "Extract hotel search criteria from summary and messages then transfer to Hotel Agent to search and recommend hotels."
 
 
-@tool
+@tool("recommend_hotels_multi")
 async def recommend_hotels_multi(
-    state: Annotated[dict, InjectedState],
-    tool_call_id: Annotated[str, InjectedToolCallId],
-    language: str = "vi",
+    language: Optional[str] = None,
+    state: Annotated[dict, InjectedState] = None,
+    tool_call_id: Annotated[str, InjectedToolCallId] = None,
 ) -> Command[Literal["hotel_agent", "chat_node"]]:
     """
     Extract multiple hotel search segments from the conversation and transfer to Hotel Agent.
@@ -254,7 +254,7 @@ Return ONLY a valid JSON object. Do not wrap in code fences or tags.
 \nResponse in {language} language.
 \nCurrent date is {current_date}. Please consider this when extracting dates, you can assume the year is {current_year} or next year if date has passed.
 \nSummary of the conversation so far (if any):\n{summary}"""
-    # language is now guaranteed from signature default
+    language = language or state.get("language", "vi")
     system_prompt = system_prompt.format(
         format_instructions=parser.get_format_instructions(),
         language=language,

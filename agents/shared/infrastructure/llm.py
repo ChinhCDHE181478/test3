@@ -31,6 +31,7 @@ llm = ChatGroq(
     temperature=settings.MODEL_TEMPERATURE,
     max_tokens=settings.MODEL_MAX_TOKENS,
     max_retries=3,
+    api_key=settings.GROQ_API_KEY
 )
 
 planning_llm = ChatGroq(
@@ -38,6 +39,7 @@ planning_llm = ChatGroq(
     temperature=settings.PLANNING_MODEL_TEMPERATURE,
     max_tokens=settings.PLANNING_MODEL_MAX_TOKENS,
     max_retries=2,
+    api_key=settings.GROQ_API_KEY
 )
 
 extract_llm = ChatGroq(
@@ -45,6 +47,7 @@ extract_llm = ChatGroq(
     temperature=0,
     max_tokens=settings.MODEL_MAX_TOKENS,
     max_retries=2,
+    api_key=settings.GROQ_API_KEY
 )
 
 # llm = ChatGoogleGenerativeAI(

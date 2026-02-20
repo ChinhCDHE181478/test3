@@ -44,8 +44,15 @@ for t in tools:
          # Try to infer from function name if possible, or set a default
          if hasattr(t, 'func') and hasattr(t.func, '__name__'):
              t.name = t.func.__name__
+         elif hasattr(t, '__name__'):
+             t.name = t.__name__
          else:
              t.name = f"tool_{id(t)}"
+    
+    if not t.name:
+        raise ValueError(f"Tool {t} has no name property and could not be inferred!")
+    
+    # print(f"Registered tool: {t.name}")
              
 chatbot = create_react_agent(
     model=llm,
