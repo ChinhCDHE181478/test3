@@ -62,14 +62,15 @@ def _validate_search_criteria(criteria: HotelSearchCriteria) -> list[str]:
 
 @tool(return_direct=True)
 def transfer_to_chatbot(
-    state: Annotated[dict, InjectedState],
-    tool_call_id: Annotated[str, InjectedToolCallId],
+    state: Annotated[dict, InjectedState] = None,
+    tool_call_id: Annotated[str, InjectedToolCallId] = None,
+    config: RunnableConfig = None,
 ) -> Command[Literal["chatbot"]]:
     """Transfer control back to the chatbot with hotel recommendations or validation guidance."""
 
     def _build_no_results_message() -> str:
-        lang = state.get("language", "vi")
-        criteria = state.get("search_criteria")
+        lang = state.get("language", "vi") if state else "vi"
+        criteria = state.get("search_criteria") if state else None
         if lang.lower().startswith("vi"):
             if criteria:
                 return (
@@ -85,6 +86,8 @@ def transfer_to_chatbot(
         return "No matching hotels found. Consider relaxing budget, reducing amenities, increasing distance, or adjusting dates."
 
     def _needs_no_results_message() -> bool:
+        if not state:
+            return False
         rec = state.get("hotel_recommendation")
         if rec and hasattr(rec, "recommended_hotels"):
             return len(rec.recommended_hotels) == 0
@@ -106,9 +109,9 @@ def transfer_to_chatbot(
     hand_off_cmd = Command(
         goto="chatbot",
         update={
-            "hotel_recommendation": state.get("hotel_recommendation"),
-            "multi_hotel_recommendation": state.get("multi_hotel_recommendation"),
-            "messages": state["messages"]
+            "hotel_recommendation": state.get("hotel_recommendation") if state else None,
+            "multi_hotel_recommendation": state.get("multi_hotel_recommendation") if state else None,
+            "messages": (state["messages"] if state else [])
             + [
                 ToolMessage(
                     content=content,
@@ -131,6 +134,7 @@ async def recommend_hotels(
     language: Optional[str] = None,
     state: Annotated[dict, InjectedState] = None,
     tool_call_id: Annotated[str, InjectedToolCallId] = None,
+    config: RunnableConfig = None,
 ) -> Command[Literal["hotel_agent", "chat_node"]]:
     """
     Extract hotel search criteria from summary and messages then transfer to Hotel Agent to search and recommend hotels.
@@ -187,7 +191,8 @@ Return ONLY a valid JSON object. Do not wrap in code fences or tags.
 
     conv_messages = _filter_conversation_messages(state["messages"])
     search_criteria: HotelSearchCriteria = await chain.ainvoke(
-        {"messages": conv_messages}
+        {"messages": conv_messages},
+        config=config
     )
 
     errors = _validate_search_criteria(search_criteria)
@@ -238,6 +243,7 @@ async def recommend_hotels_multi(
     language: Optional[str] = None,
     state: Annotated[dict, InjectedState] = None,
     tool_call_id: Annotated[str, InjectedToolCallId] = None,
+    config: RunnableConfig = None,
 ) -> Command[Literal["hotel_agent", "chat_node"]]:
     """
     Extract multiple hotel search segments from the conversation and transfer to Hotel Agent.
@@ -274,7 +280,8 @@ Return ONLY a valid JSON object. Do not wrap in code fences or tags.
 
     conv_messages = _filter_conversation_messages(state["messages"])
     multi_criteria: MultiHotelSearchCriteria = await chain.ainvoke(
-        {"messages": conv_messages}
+        {"messages": conv_messages},
+        config=config
     )
 
     invalid_segments: list[str] = []

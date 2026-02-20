@@ -7,6 +7,7 @@ from langchain_core.prompts import MessagesPlaceholder
 from langgraph.prebuilt import InjectedState
 from langchain_core.output_parsers import PydanticOutputParser
 from langchain_tavily import TavilySearch
+from langchain_core.runnables import RunnableConfig
 from langchain_core.tools import tool, InjectedToolCallId
 from langgraph.types import Command
 from langchain_core.messages import ToolMessage
@@ -48,6 +49,7 @@ async def search_for_places(
     queries: list[str],
     language: Optional[str] = None,
     state: Annotated[dict, InjectedState] = None,
+    config: RunnableConfig = None,
 ) -> list[Place]:
     """
     Search for places based on queries, language, returns a list of places including their name, address, and coordinates.
@@ -59,7 +61,7 @@ async def search_for_places(
     Returns:
         list[Place]: A list of places.
     """
-    language = language or state.get("language", "vi")
+    language = language or (state.get("language") if state else "vi")
 
     return await search_places_tool.search_for_places(queries, language)
 
@@ -72,6 +74,7 @@ async def plan_itinerary(
     language: Optional[str] = None,
     state: Annotated[dict, InjectedState] = None,
     tool_call_id: Annotated[str, InjectedToolCallId] = None,
+    config: RunnableConfig = None,
 ) -> Command[Literal["plan_agent", "chat_node"]]:
     """
     Extract the plan details from summary and messages then transfer to Plan Agent to create an itinerary.
@@ -104,7 +107,7 @@ Return ONLY a valid JSON object. Do not wrap in code fences or tags.
     chain = prompt | extract_llm | parser
 
     conv_messages = _filter_conversation_messages(state["messages"])
-    plan: Plan = await chain.ainvoke({"messages": conv_messages})
+    plan: Plan = await chain.ainvoke({"messages": conv_messages}, config=config)
 
     return Command(
         goto="plan_agent",

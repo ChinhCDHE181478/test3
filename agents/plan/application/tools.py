@@ -1,5 +1,6 @@
 from typing import Annotated, Literal
 from langchain_core.messages import ToolMessage
+from langchain_core.runnables import RunnableConfig
 from langchain_core.tools import InjectedToolCallId, tool
 from langgraph.prebuilt import InjectedState
 from langgraph.types import Command
@@ -9,9 +10,10 @@ from langgraph.types import Command
 def transfer_to_chatbot(
     state: Annotated[dict, InjectedState] = None,
     tool_call_id: Annotated[str, InjectedToolCallId] = None,
+    config: RunnableConfig = None,
 ) -> Command[Literal["chatbot"]]:
     """Transfer the itinerary to Chatbot"""
-    itinerary = state["itinerary"]
+    itinerary = state["itinerary"] if state else None
     summary = (
         f"Itinerary created for {itinerary.trip_summary.destinations} "
         f"({itinerary.trip_summary.total_days} days). "
@@ -23,7 +25,7 @@ def transfer_to_chatbot(
         goto="chatbot",
         update={
             "itinerary": itinerary,
-            "messages": state["messages"]
+            "messages": (state["messages"] if state else [])
             + [
                 ToolMessage(
                     content=f"Transfer to Chatbot. Create itinerary successfully. Summary: {summary}",
@@ -35,3 +37,5 @@ def transfer_to_chatbot(
         graph=Command.PARENT,
     )
 
+transfer_to_chatbot.name="transfer_to_chatbot"
+transfer_to_chatbot.description="Transfer the itinerary to Chatbot"
