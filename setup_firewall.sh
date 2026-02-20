@@ -55,7 +55,7 @@ ufw allow out 80/tcp
 ufw allow out 443/tcp
 
 # SAU ĐÓ: CHẶN TOÀN BỘ UDP CÒN LẠI RA NGOÀI (Chống UDP Flood)
-ufw deny out proto udp
+ufw deny out to any proto udp
 
 # =================================================================
 # 4. BẢO VỆ CÁC PORT NHẠY CẢM (DATABASE, REDIS)
