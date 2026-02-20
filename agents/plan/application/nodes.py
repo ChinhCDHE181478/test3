@@ -158,7 +158,7 @@ async def transfer_node(
         ],
     )
 
-    return {"messages": [response]}
+    return {**state, "messages": [response]}
 
 
 async def get_restaurants_node(

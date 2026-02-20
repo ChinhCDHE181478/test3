@@ -30,6 +30,9 @@ from shared.runtime import ContextSchema
 class DestinationQuery(BaseModel):
     destination: str = Field(description="Formatted destination name for Booking.com")
 
+    class Config:
+        title = "DestinationQuery"
+
 
 async def search_hotels_node(
     state: HotelAgentState,

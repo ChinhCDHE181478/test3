@@ -11,6 +11,7 @@ from langchain_core.tools import tool, InjectedToolCallId
 from langgraph.types import Command
 from langchain_core.messages import ToolMessage
 from langchain_core.messages import BaseMessage, HumanMessage, AIMessage
+from langchain_core.tools import StructuredTool
 
 from shared.tools.search_places import SearchPlacesTool
 from shared.infrastructure.config.settings import settings
@@ -18,13 +19,17 @@ from shared.infrastructure.llm import extract_llm
 from shared.models import Place, Plan
 
 
-search_tool = TavilySearch(
+tavily_instance = TavilySearch(
     max_results=5,
     topic="general",
     tavily_api_key=settings.TAVILY_API_KEY,
 )
 
-search_tool.name = "tavily_search"
+search_tool = StructuredTool.from_function(
+    func=tavily_instance.invoke,
+    name="tavily_search",
+    description="A search engine optimized for comprehensive, accurate, and trusted results. Useful for when you need to answer questions about current events.",
+)
 
 search_places_tool = SearchPlacesTool(api_key=settings.SERPAPI_API_KEY)
 

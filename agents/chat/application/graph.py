@@ -40,12 +40,14 @@ tools = [
 
 # Identify any tools without a name and auto-fix or raise error
 for t in tools:
-    if not t.name:
+    if not hasattr(t, 'name') or not t.name:
          # Try to infer from function name if possible, or set a default
          if hasattr(t, 'func') and hasattr(t.func, '__name__'):
              t.name = t.func.__name__
          elif hasattr(t, '__name__'):
              t.name = t.__name__
+         elif hasattr(t, '__class__') and t.__class__.__name__ != 'function':
+             t.name = t.__class__.__name__.lower()
          else:
              t.name = f"tool_{id(t)}"
     
