@@ -5,6 +5,7 @@ from loguru import logger
 from langchain_core.prompts import ChatPromptTemplate
 from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlmodel import desc, select
+from sqlalchemy.exc import IntegrityError
 
 from api.common import Page, PaginatedResponse
 from chat.domain.entities import UserConversation
@@ -76,7 +77,20 @@ class UserConversationService:
         config: RunnableConfig = None,
     ) -> UserConversation:
         try:
-            title = await self.generate_title_from_user_message(content, config=config)
+            title = self._fallback_title(content)
+            try:
+                generated = await self.generate_title_from_user_message(
+                    content, config=config
+                )
+                if generated and str(generated).strip():
+                    title = str(generated).strip()[:80]
+            except Exception as title_error:
+                logger.warning(
+                    "Title generation failed, using fallback title. user_id={user_id}, session_id={session_id}, error={error}",
+                    user_id=user_id,
+                    session_id=session_id,
+                    error=str(title_error),
+                )
 
             user_conversation = UserConversation(
                 user_id=int(user_id),
@@ -84,11 +98,24 @@ class UserConversationService:
                 title=title,
             )
             self._db_session.add(user_conversation)
-            await self._db_session.commit()
+            try:
+                await self._db_session.commit()
+            except IntegrityError:
+                await self._db_session.rollback()
+                existing = await self.find_user_conversation(
+                    user_id=user_id, session_id=session_id
+                )
+                if existing:
+                    return existing
+                raise
             await self._db_session.refresh(user_conversation)
             return user_conversation
         except Exception as e:
-            logger.error(f"Error creating conversation for user: {user_id}")
+            logger.exception(
+                "Error creating conversation for user: {user_id}, session_id={session_id}",
+                user_id=user_id,
+                session_id=session_id,
+            )
             raise RuntimeError(
                 f"Error creating conversation for user: {user_id}"
             ) from e
@@ -119,3 +146,9 @@ class UserConversationService:
         response = await chain.ainvoke({"message": message}, config=config)
 
         return str(response.content)
+    @staticmethod
+    def _fallback_title(message: str) -> str:
+        raw = (message or "").strip().replace("\n", " ")
+        if not raw:
+            return "New Chat"
+        return raw[:80]
