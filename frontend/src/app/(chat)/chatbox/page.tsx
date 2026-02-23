@@ -127,7 +127,7 @@ const openGoogleMaps = (query: string) => {
 function VivuplanPremiumContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, isLoading: isAuthLoading } = useAuth();
 
   const [mounted, setMounted] = useState(false);
   const [activeId, setActiveId] = useState<string>("");
@@ -186,6 +186,7 @@ function VivuplanPremiumContent() {
   const [subStatus, setSubStatus] = useState<SubStatus>({ active: false, packageCode: null });
   const [showPaywall, setShowPaywall] = useState(false);
   const [isPurchasing, setIsPurchasing] = useState(false);
+  const [isAccessCheckLoading, setIsAccessCheckLoading] = useState(true);
 
   const newSessionId = () => {
     try {
@@ -216,6 +217,7 @@ function VivuplanPremiumContent() {
   }, [itineraryData]);
 
   const shouldLockContent = useMemo(() => {
+    if (isAccessCheckLoading) return false;
     if (subStatus.active) return false;
     const hasAnyResult = Boolean(itineraryData || hotelData);
     const hasAnyMsg = messages.length > 0;
@@ -224,7 +226,7 @@ function VivuplanPremiumContent() {
     if (!isAuthenticated && !allowGuestDemo) return true;
     if (isFirstTime) return false;
     return true;
-  }, [subStatus.active, isAuthenticated, allowGuestDemo, itineraryData, hotelData, messages.length, chatHistory.length]);
+  }, [isAccessCheckLoading, subStatus.active, isAuthenticated, allowGuestDemo, itineraryData, hotelData, messages.length, chatHistory.length]);
 
   const loadHistory = async () => {
     try {
@@ -383,6 +385,7 @@ function VivuplanPremiumContent() {
 
   const executeSend = async (text: string) => {
     if (!text || isLoading) return;
+    if (isAuthLoading || isAccessCheckLoading) return;
     if (!isAuthenticated && !allowGuestDemo) { setShowLoginGate(true); return; }
     if (shouldLockContent) { setShowPaywall(true); return; }
 
@@ -526,26 +529,42 @@ function VivuplanPremiumContent() {
   useEffect(() => setMounted(true), []);
   useEffect(() => { if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight; }, [messages, isLoading]);
   useEffect(() => {
-    if (!mounted) return;
-    if (isAuthenticated) {
-      loadHistory();
-    } else {
+    if (!mounted || isAuthLoading) return;
+    if (!isAuthenticated) {
       const promptFromUrl = searchParams.get("prompt");
       if (promptFromUrl) { setAllowGuestDemo(true); setShowLoginGate(false); } else { /* setShowLoginGate(true); */ }
     }
     setActiveId(newSessionId());
-  }, [mounted, isAuthenticated]);
+  }, [mounted, isAuthLoading, isAuthenticated, searchParams]);
 
   useEffect(() => {
-    if (!mounted) return;
+    if (!mounted || isAuthLoading) return;
+    if (isAuthenticated && !user?.id) return;
+
+    let cancelled = false;
+    const bootstrapAccess = async () => {
+      setIsAccessCheckLoading(true);
+      if (isAuthenticated && user?.id) {
+        await Promise.all([loadHistory(), fetchSubscriptionStatus()]);
+      } else {
+        setChatHistory([]);
+        setSubStatus({ active: false, packageCode: null });
+      }
+      if (!cancelled) setIsAccessCheckLoading(false);
+    };
+
+    bootstrapAccess();
+    return () => { cancelled = true; };
+  }, [mounted, isAuthLoading, isAuthenticated, user?.id]);
+
+  useEffect(() => {
+    if (!mounted || isAuthLoading || isAccessCheckLoading) return;
     const promptFromUrl = searchParams.get("prompt");
     if (promptFromUrl && !hasProcessedInitialPrompt.current) {
       hasProcessedInitialPrompt.current = true;
       setTimeout(() => { executeSend(promptFromUrl); window.history.replaceState({}, '', window.location.pathname); }, 500);
     }
-  }, [mounted, searchParams]);
-
-  useEffect(() => { if (user?.id) fetchSubscriptionStatus(); }, [user?.id]);
+  }, [mounted, isAuthLoading, isAccessCheckLoading, searchParams]);
 
   const LoginGateModal = () => (
     <div className="fixed inset-0 z-[20000] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
@@ -603,12 +622,21 @@ function VivuplanPremiumContent() {
     </div>
   );
 
-  if (!mounted) return null;
+  if (!mounted || isAuthLoading || isAccessCheckLoading) {
+    return (
+      <div className="fixed inset-0 top-[68px] w-screen h-[calc(100dvh-68px)] bg-white flex items-center justify-center">
+        <div className="flex items-center gap-3 text-slate-500 text-sm font-semibold">
+          <Loader2 size={18} className="animate-spin text-[#0056D2]" />
+          <span>Đang kiểm tra quyền truy cập...</span>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="fixed inset-0 top-[68px] w-screen h-[calc(100dvh-68px)] bg-white text-slate-900 font-sans flex overflow-hidden text-sm shadow-inner">
       {showLoginGate && <LoginGateModal />}
-      {showPaywall && <PaywallModal isOpen={showPaywall} onClose={() => setShowPaywall(false)} isAuthenticated={isAuthenticated} subStatus={subStatus} isPurchasing={isPurchasing} onPurchase={purchaseSubscription} onCheckStatus={fetchSubscriptionStatus} />}
+      {showPaywall && !isAccessCheckLoading && <PaywallModal isOpen={showPaywall} onClose={() => setShowPaywall(false)} isAuthenticated={isAuthenticated} subStatus={subStatus} isPurchasing={isPurchasing} onPurchase={purchaseSubscription} onCheckStatus={fetchSubscriptionStatus} />}
 
       {/* SIDEBAR */}
       <aside className={`absolute md:relative inset-y-0 left-0 z-[3000] w-[280px] bg-white border-r border-slate-100 flex flex-col transition-transform duration-300 shadow-2xl md:shadow-none ${isSidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"}`}>
@@ -740,7 +768,7 @@ function VivuplanPremiumContent() {
                   </div>
                 )}
                 <div className="max-w-3xl mx-auto flex items-end gap-2"><button onClick={() => setIsPromptPopoverOpen(!isPromptPopoverOpen)} className={`h-12 w-12 rounded-2xl flex flex-col items-center justify-center border ${isPromptPopoverOpen ? "bg-blue-50 border-blue-200 text-[#0056D2]" : "bg-slate-50 border-transparent text-slate-400 hover:text-[#0056D2]"}`}><FilePenLine size={18} /></button><div className="relative flex-1"><textarea value={inputText} onChange={(e) => setInputText(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } }} className="w-full bg-slate-50 border-none rounded-2xl p-4 pr-12 text-[13px] h-12 md:h-14 resize-none outline-none focus:bg-white focus:ring-1 focus:ring-blue-200 transition-all font-medium shadow-inner" placeholder="Nhập yêu cầu..." /><button onClick={handleSend} disabled={isLoading} className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 md:w-10 md:h-10 bg-[#0056D2] text-white rounded-xl flex items-center justify-center hover:bg-blue-700 disabled:opacity-50"><Send size={16} /></button></div></div>
-                {!subStatus.active && (<div className="max-w-3xl mx-auto mt-2 text-[10px] text-slate-400 flex items-center justify-between"><span>Chưa kích hoạt gói — tạo xong sẽ yêu cầu mua gói.</span><button onClick={() => setShowPaywall(true)} className="text-[#0056D2] font-black hover:underline">Xem gói</button></div>)}
+                {!isAccessCheckLoading && !subStatus.active && (<div className="max-w-3xl mx-auto mt-2 text-[10px] text-slate-400 flex items-center justify-between"><span>Chưa kích hoạt gói — tạo xong sẽ yêu cầu mua gói.</span><button onClick={() => setShowPaywall(true)} className="text-[#0056D2] font-black hover:underline">Xem gói</button></div>)}
               </div>
             </div>
 

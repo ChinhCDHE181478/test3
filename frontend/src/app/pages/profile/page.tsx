@@ -383,9 +383,6 @@ function SubscriptionPanel({ userId }: { userId: number }) {
                 <span className="px-3 py-1 rounded-full text-xs font-bold bg-green-100 text-green-700 flex items-center gap-1">
                   <CheckCircle2 size={12} /> ĐANG HOẠT ĐỘNG
                 </span>
-                <span className="text-xs text-slate-500 font-medium">
-                  Ngày đăng ký: {formatDate(subData.startDate || "")}
-                </span>
               </div>
 
               <h3 className="text-2xl font-bold text-slate-900 mb-1">{subData.planName || "Gói dịch vụ"}</h3>
