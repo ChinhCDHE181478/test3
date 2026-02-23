@@ -51,6 +51,12 @@ type SubStatus = {
   raw?: any;
 };
 
+type SubscriptionCheckResult = {
+  active: boolean;
+  packageCode: string | null;
+  error?: boolean;
+};
+
 function formatVND(n: number) {
   try {
     return n.toLocaleString("vi-VN") + "đ";
@@ -187,6 +193,8 @@ function VivuplanPremiumContent() {
   const [showPaywall, setShowPaywall] = useState(false);
   const [isPurchasing, setIsPurchasing] = useState(false);
   const [isAccessCheckLoading, setIsAccessCheckLoading] = useState(true);
+  const [isSubStatusResolved, setIsSubStatusResolved] = useState(false);
+  const [subStatusError, setSubStatusError] = useState<string | null>(null);
 
   const newSessionId = () => {
     try {
@@ -218,7 +226,12 @@ function VivuplanPremiumContent() {
 
   const shouldLockContent = useMemo(() => {
     if (isAccessCheckLoading) return false;
-    if (subStatus.active) return false;
+    if (isAuthenticated && !allowGuestDemo) {
+      if (!isSubStatusResolved) return false;
+      if (subStatusError) return false;
+      if (subStatus.active) return false;
+    }
+
     const hasAnyResult = Boolean(itineraryData || hotelData);
     const hasAnyMsg = messages.length > 0;
     const hasAnyHistory = chatHistory.length > 0;
@@ -226,7 +239,7 @@ function VivuplanPremiumContent() {
     if (!isAuthenticated && !allowGuestDemo) return true;
     if (isFirstTime) return false;
     return true;
-  }, [isAccessCheckLoading, subStatus.active, isAuthenticated, allowGuestDemo, itineraryData, hotelData, messages.length, chatHistory.length]);
+  }, [isAccessCheckLoading, isAuthenticated, allowGuestDemo, isSubStatusResolved, subStatusError, subStatus.active, itineraryData, hotelData, messages.length, chatHistory.length]);
 
   const loadHistory = async () => {
     try {
@@ -261,24 +274,44 @@ function VivuplanPremiumContent() {
     setInputText(""); setSelectedDayIdx(null); setViewMode("chat"); setIsSidebarOpen(false);
   };
 
-  const fetchSubscriptionStatus = async () => {
+  const fetchSubscriptionStatus = async (): Promise<SubscriptionCheckResult> => {
     const uid = user?.id;
-    if (!uid) return { active: false, packageCode: null };
+    if (!uid) {
+      setSubStatus({ active: false, packageCode: null });
+      setSubStatusError(null);
+      setIsSubStatusResolved(true);
+      return { active: false, packageCode: null };
+    }
+
+    setSubStatusError(null);
     try {
-      const { res, json, text } = await fetchJsonSafe(`${SPRING_BOOT_API}/subscriptions/status?userId=${encodeURIComponent(String(uid))}`);
+      const { res, json } = await fetchJsonSafe(`${SPRING_BOOT_API}/subscriptions/status?userId=${encodeURIComponent(String(uid))}`);
       console.log("🔍 Subscription check for userId:", uid, "Response:", { ok: res.ok, json });
-      if (!res.ok) { setSubStatus({ active: false, packageCode: null, raw: text }); return { active: false, packageCode: null }; }
+      if (!res.ok) {
+        setSubStatusError(`HTTP_${res.status}`);
+        setIsSubStatusResolved(true);
+        return { active: false, packageCode: null, error: true };
+      }
       const data = json ?? {};
       const result = data?.result ?? data;
       const active = Boolean(result?.active) || Boolean(result?.isActive) || String(result?.status || "").toLowerCase() === "active" || Boolean(result?.valid);
       const packageCode = result?.packageCode ?? result?.package_code ?? result?.plan ?? null;
       console.log("✅ Subscription status:", { active, packageCode, result });
       setSubStatus({ active, packageCode, raw: data });
+      setSubStatusError(null);
+      setIsSubStatusResolved(true);
       return { active, packageCode };
     } catch (err) {
       console.error("❌ Subscription error:", err);
-      return { active: false, packageCode: null };
+      setSubStatusError("NETWORK_ERROR");
+      setIsSubStatusResolved(true);
+      return { active: false, packageCode: null, error: true };
     }
+  };
+
+  const handleCheckPaymentStatus = async () => {
+    const next = await fetchSubscriptionStatus();
+    if (next.active) setShowPaywall(false);
   };
 
   const purchaseSubscription = async (packageCode: string) => {
@@ -487,7 +520,6 @@ function VivuplanPremiumContent() {
       }
 
       await loadHistory();
-      if (!subStatus.active) setShowPaywall(true);
 
     } catch (err) {
       console.error("Stream error:", err);
@@ -544,11 +576,14 @@ function VivuplanPremiumContent() {
     let cancelled = false;
     const bootstrapAccess = async () => {
       setIsAccessCheckLoading(true);
+      setIsSubStatusResolved(false);
+      setSubStatusError(null);
       if (isAuthenticated && user?.id) {
         await Promise.all([loadHistory(), fetchSubscriptionStatus()]);
       } else {
         setChatHistory([]);
         setSubStatus({ active: false, packageCode: null });
+        setIsSubStatusResolved(true);
       }
       if (!cancelled) setIsAccessCheckLoading(false);
     };
@@ -565,6 +600,12 @@ function VivuplanPremiumContent() {
       setTimeout(() => { executeSend(promptFromUrl); window.history.replaceState({}, '', window.location.pathname); }, 500);
     }
   }, [mounted, isAuthLoading, isAccessCheckLoading, searchParams]);
+
+  useEffect(() => {
+    if (subStatus.active || subStatusError) {
+      setShowPaywall(false);
+    }
+  }, [subStatus.active, subStatusError]);
 
   const LoginGateModal = () => (
     <div className="fixed inset-0 z-[20000] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
@@ -636,7 +677,7 @@ function VivuplanPremiumContent() {
   return (
     <div className="fixed inset-0 top-[68px] w-screen h-[calc(100dvh-68px)] bg-white text-slate-900 font-sans flex overflow-hidden text-sm shadow-inner">
       {showLoginGate && <LoginGateModal />}
-      {showPaywall && !isAccessCheckLoading && <PaywallModal isOpen={showPaywall} onClose={() => setShowPaywall(false)} isAuthenticated={isAuthenticated} subStatus={subStatus} isPurchasing={isPurchasing} onPurchase={purchaseSubscription} onCheckStatus={fetchSubscriptionStatus} />}
+      {showPaywall && !isAccessCheckLoading && !subStatusError && !subStatus.active && <PaywallModal isOpen={showPaywall} onClose={() => setShowPaywall(false)} isAuthenticated={isAuthenticated} subStatus={subStatus} isPurchasing={isPurchasing} onPurchase={purchaseSubscription} onCheckStatus={handleCheckPaymentStatus} />}
 
       {/* SIDEBAR */}
       <aside className={`absolute md:relative inset-y-0 left-0 z-[3000] w-[280px] bg-white border-r border-slate-100 flex flex-col transition-transform duration-300 shadow-2xl md:shadow-none ${isSidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"}`}>
@@ -768,7 +809,7 @@ function VivuplanPremiumContent() {
                   </div>
                 )}
                 <div className="max-w-3xl mx-auto flex items-end gap-2"><button onClick={() => setIsPromptPopoverOpen(!isPromptPopoverOpen)} className={`h-12 w-12 rounded-2xl flex flex-col items-center justify-center border ${isPromptPopoverOpen ? "bg-blue-50 border-blue-200 text-[#0056D2]" : "bg-slate-50 border-transparent text-slate-400 hover:text-[#0056D2]"}`}><FilePenLine size={18} /></button><div className="relative flex-1"><textarea value={inputText} onChange={(e) => setInputText(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } }} className="w-full bg-slate-50 border-none rounded-2xl p-4 pr-12 text-[13px] h-12 md:h-14 resize-none outline-none focus:bg-white focus:ring-1 focus:ring-blue-200 transition-all font-medium shadow-inner" placeholder="Nhập yêu cầu..." /><button onClick={handleSend} disabled={isLoading} className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 md:w-10 md:h-10 bg-[#0056D2] text-white rounded-xl flex items-center justify-center hover:bg-blue-700 disabled:opacity-50"><Send size={16} /></button></div></div>
-                {!isAccessCheckLoading && !subStatus.active && (<div className="max-w-3xl mx-auto mt-2 text-[10px] text-slate-400 flex items-center justify-between"><span>Chưa kích hoạt gói — tạo xong sẽ yêu cầu mua gói.</span><button onClick={() => setShowPaywall(true)} className="text-[#0056D2] font-black hover:underline">Xem gói</button></div>)}
+                {!isAccessCheckLoading && isSubStatusResolved && !subStatusError && !subStatus.active && (<div className="max-w-3xl mx-auto mt-2 text-[10px] text-slate-400 flex items-center justify-between"><span>Chưa kích hoạt gói — tạo xong sẽ yêu cầu mua gói.</span><button onClick={() => setShowPaywall(true)} className="text-[#0056D2] font-black hover:underline">Xem gói</button></div>)}
               </div>
             </div>
 
