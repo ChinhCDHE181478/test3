@@ -239,6 +239,20 @@ async def rank_hotels_node(
             f"&currencyCode=VND"
         )
     
+    # Emit a final complete event with fully enriched data (including details/images)
+    # so the frontend receives the full data without requiring a page reload.
+    try:
+        stream_writer(
+            {
+                "data-hotel": {
+                    "data": recommendation.model_dump(mode="json"),
+                    "metadata": {"langgraph_node": "rank_hotels_node"},
+                }
+            }
+        )
+    except Exception as e:
+        logger.warning(f"rank_hotels_node: failed to emit final enriched event: {e}")
+    
     return {"hotel_recommendation": recommendation}
 
 

@@ -78,6 +78,20 @@ async def create_itinerary_node(
     # Add destination_image_url to response before creating ItineraryResponse
     response["destination_image_url"] = state.get("destination_image_url")
 
+    # Emit a final complete event with destination_image_url included
+    # so the frontend receives the banner image without requiring a page reload.
+    try:
+        stream_writer(
+            {
+                "data-itinerary": {
+                    "data": response,
+                    "metadata": {"langgraph_node": "create_itinerary_node"},
+                }
+            }
+        )
+    except Exception as e:
+        logger.warning(f"create_itinerary_node: failed to emit final enriched event: {e}")
+
     return {
         "itinerary": ItineraryResponse(**response),
     }
