@@ -195,8 +195,6 @@ function VivuplanPremiumContent() {
   const [isAccessCheckLoading, setIsAccessCheckLoading] = useState(true);
   const [isSubStatusResolved, setIsSubStatusResolved] = useState(false);
   const [subStatusError, setSubStatusError] = useState<string | null>(null);
-  const [canEnforceAccessGate, setCanEnforceAccessGate] = useState(false);
-  const [authHydrationSettled, setAuthHydrationSettled] = useState(false);
 
   const newSessionId = () => {
     try {
@@ -226,10 +224,14 @@ function VivuplanPremiumContent() {
     );
   }, [itineraryData]);
 
+  // VÁ LỖI HIỂN THỊ "NỘI DUNG BỊ KHÓA"
   const shouldLockContent = useMemo(() => {
-    if (!canEnforceAccessGate) return false;
     if (isAccessCheckLoading) return false;
-    if (isAuthenticated && !allowGuestDemo) {
+    
+    // Fix chớp màn hình: Check trực tiếp URL param thay vì chờ useEffect set state allowGuestDemo
+    const isDemoGuest = allowGuestDemo || Boolean(searchParams?.get("prompt"));
+
+    if (isAuthenticated && !isDemoGuest) {
       if (!isSubStatusResolved) return false;
       if (subStatusError) return false;
       if (subStatus.active) return false;
@@ -239,10 +241,23 @@ function VivuplanPremiumContent() {
     const hasAnyMsg = messages.length > 0;
     const hasAnyHistory = chatHistory.length > 0;
     const isFirstTime = !hasAnyHistory && !hasAnyMsg && !hasAnyResult;
-    if (!isAuthenticated && !allowGuestDemo) return authHydrationSettled;
+    
+    if (!isAuthenticated && !isDemoGuest) return true;
     if (isFirstTime) return false;
     return true;
-  }, [canEnforceAccessGate, isAccessCheckLoading, isAuthenticated, allowGuestDemo, isSubStatusResolved, subStatusError, subStatus.active, itineraryData, hotelData, messages.length, chatHistory.length, authHydrationSettled]);
+  }, [
+    isAccessCheckLoading, 
+    isAuthenticated, 
+    allowGuestDemo, 
+    isSubStatusResolved, 
+    subStatusError, 
+    subStatus.active, 
+    itineraryData, 
+    hotelData, 
+    messages.length, 
+    chatHistory.length, 
+    searchParams
+  ]);
 
   const loadHistory = async () => {
     try {
@@ -605,38 +620,6 @@ function VivuplanPremiumContent() {
   }, [mounted, isAuthLoading, isAccessCheckLoading, searchParams]);
 
   useEffect(() => {
-    if (!mounted || isAuthLoading || isAccessCheckLoading) {
-      setCanEnforceAccessGate(false);
-      return;
-    }
-    const timer = window.setTimeout(() => setCanEnforceAccessGate(true), 300);
-    return () => window.clearTimeout(timer);
-  }, [mounted, isAuthLoading, isAccessCheckLoading, isAuthenticated, user?.id]);
-
-  useEffect(() => {
-    if (!mounted || isAuthLoading) {
-      setAuthHydrationSettled(false);
-      return;
-    }
-
-    if (isAuthenticated) {
-      setAuthHydrationSettled(true);
-      return;
-    }
-
-    const hasLocalToken = Boolean(getTokenFromStorage());
-    if (!hasLocalToken) {
-      setAuthHydrationSettled(true);
-      return;
-    }
-
-    // Grace window for AuthProvider to hydrate from token after F5/navigation.
-    setAuthHydrationSettled(false);
-    const timer = window.setTimeout(() => setAuthHydrationSettled(true), 1500);
-    return () => window.clearTimeout(timer);
-  }, [mounted, isAuthLoading, isAuthenticated]);
-
-  useEffect(() => {
     if (subStatus.active || subStatusError) {
       setShowPaywall(false);
     }
@@ -687,13 +670,21 @@ function VivuplanPremiumContent() {
     );
   }
 
+  // VÁ LỖI HIỂN THỊ FADE IN ĐỂ CHỐNG CLICK NHẦM
   const BlurLockLayer = () => (
-    <div className="absolute inset-0 z-[150] bg-white/60 backdrop-blur-sm flex items-center justify-center p-6">
+    <div className="absolute inset-0 z-[150] bg-white/60 backdrop-blur-sm flex items-center justify-center p-6 animate-in fade-in duration-300 fill-mode-both">
       <div className="bg-white p-6 rounded-3xl shadow-xl text-center border border-slate-100 max-w-sm">
-        <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-3"><Lock size={20} /></div>
+        <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-3">
+          <Lock size={20} />
+        </div>
         <h3 className="font-bold text-slate-900">Nội dung bị khóa</h3>
         <p className="text-xs text-slate-500 mt-1 mb-4">Vui lòng mở khóa Premium để xem chi tiết.</p>
-        <button onClick={() => { if (canEnforceAccessGate) setShowPaywall(true); }} disabled={!canEnforceAccessGate} className="bg-blue-600 disabled:bg-slate-300 disabled:cursor-not-allowed text-white px-6 py-2 rounded-xl text-xs font-bold uppercase tracking-wide hover:bg-blue-700">Mở khóa ngay</button>
+        <button 
+          onClick={() => setShowPaywall(true)} 
+          className="bg-blue-600 text-white px-6 py-2 rounded-xl text-xs font-bold uppercase tracking-wide hover:bg-blue-700 transition-all active:scale-95"
+        >
+          Mở khóa ngay
+        </button>
       </div>
     </div>
   );
@@ -712,7 +703,7 @@ function VivuplanPremiumContent() {
   return (
     <div className="fixed inset-0 top-[68px] w-screen h-[calc(100dvh-68px)] bg-white text-slate-900 font-sans flex overflow-hidden text-sm shadow-inner">
       {showLoginGate && <LoginGateModal />}
-      {showPaywall && canEnforceAccessGate && !isAccessCheckLoading && !subStatusError && !subStatus.active && <PaywallModal isOpen={showPaywall} onClose={() => setShowPaywall(false)} isAuthenticated={isAuthenticated} subStatus={subStatus} isPurchasing={isPurchasing} onPurchase={purchaseSubscription} onCheckStatus={handleCheckPaymentStatus} />}
+      {showPaywall && !isAccessCheckLoading && !subStatusError && !subStatus.active && <PaywallModal isOpen={showPaywall} onClose={() => setShowPaywall(false)} isAuthenticated={isAuthenticated} subStatus={subStatus} isPurchasing={isPurchasing} onPurchase={purchaseSubscription} onCheckStatus={handleCheckPaymentStatus} />}
 
       {/* SIDEBAR */}
       <aside className={`absolute md:relative inset-y-0 left-0 z-[3000] w-[280px] bg-white border-r border-slate-100 flex flex-col transition-transform duration-300 shadow-2xl md:shadow-none ${isSidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"}`}>
