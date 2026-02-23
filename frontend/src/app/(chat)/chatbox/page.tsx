@@ -196,6 +196,7 @@ function VivuplanPremiumContent() {
   const [isSubStatusResolved, setIsSubStatusResolved] = useState(false);
   const [subStatusError, setSubStatusError] = useState<string | null>(null);
   const [canEnforceAccessGate, setCanEnforceAccessGate] = useState(false);
+  const [authHydrationSettled, setAuthHydrationSettled] = useState(false);
 
   const newSessionId = () => {
     try {
@@ -238,10 +239,10 @@ function VivuplanPremiumContent() {
     const hasAnyMsg = messages.length > 0;
     const hasAnyHistory = chatHistory.length > 0;
     const isFirstTime = !hasAnyHistory && !hasAnyMsg && !hasAnyResult;
-    if (!isAuthenticated && !allowGuestDemo) return true;
+    if (!isAuthenticated && !allowGuestDemo) return authHydrationSettled;
     if (isFirstTime) return false;
     return true;
-  }, [canEnforceAccessGate, isAccessCheckLoading, isAuthenticated, allowGuestDemo, isSubStatusResolved, subStatusError, subStatus.active, itineraryData, hotelData, messages.length, chatHistory.length]);
+  }, [canEnforceAccessGate, isAccessCheckLoading, isAuthenticated, allowGuestDemo, isSubStatusResolved, subStatusError, subStatus.active, itineraryData, hotelData, messages.length, chatHistory.length, authHydrationSettled]);
 
   const loadHistory = async () => {
     try {
@@ -611,6 +612,29 @@ function VivuplanPremiumContent() {
     const timer = window.setTimeout(() => setCanEnforceAccessGate(true), 300);
     return () => window.clearTimeout(timer);
   }, [mounted, isAuthLoading, isAccessCheckLoading, isAuthenticated, user?.id]);
+
+  useEffect(() => {
+    if (!mounted || isAuthLoading) {
+      setAuthHydrationSettled(false);
+      return;
+    }
+
+    if (isAuthenticated) {
+      setAuthHydrationSettled(true);
+      return;
+    }
+
+    const hasLocalToken = Boolean(getTokenFromStorage());
+    if (!hasLocalToken) {
+      setAuthHydrationSettled(true);
+      return;
+    }
+
+    // Grace window for AuthProvider to hydrate from token after F5/navigation.
+    setAuthHydrationSettled(false);
+    const timer = window.setTimeout(() => setAuthHydrationSettled(true), 1500);
+    return () => window.clearTimeout(timer);
+  }, [mounted, isAuthLoading, isAuthenticated]);
 
   useEffect(() => {
     if (subStatus.active || subStatusError) {
