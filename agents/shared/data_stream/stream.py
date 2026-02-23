@@ -53,16 +53,22 @@ class StreamResponse:
         try:
             async for chunk in self._iterator:
                 if isinstance(chunk, tuple):
-                    _, stream_mode, step = chunk
+                    if len(chunk) == 3:
+                        namespace, stream_mode, data = chunk
+                    elif len(chunk) == 2:
+                        namespace, (stream_mode, data) = (), chunk
+                    else:
+                        continue
+
                     if (
                         stream_mode == "messages"
-                        and isinstance(step, tuple)
-                        and len(step) == 2
+                        and isinstance(data, tuple)
+                        and len(data) == 2
                     ):
-                        for part in self._stream_text_delta(step):
+                        for part in self._stream_text_delta(data, namespace=namespace):
                             yield part
-                    elif stream_mode == "custom" and isinstance(step, dict):
-                        for part in self._stream_custom_data(step):
+                    elif stream_mode == "custom" and isinstance(data, dict):
+                        for part in self._stream_custom_data(data):
                             yield part
 
         except Exception as e:
@@ -77,27 +83,58 @@ class StreamResponse:
                 yield DataStreamFinishPart().format()
         yield DataStreamTerminationPart().format()
 
-    def _stream_text_delta(self, step: Tuple):
+    def _stream_text_delta(self, step: Tuple, namespace: Tuple = ()):
         message, metadata = step
-        if self._messages_streamable_nodes:
-            if metadata.get("langgraph_node") in self._messages_streamable_nodes:
-                if hasattr(message, "content") and message.content:
-                    if not self._message_started:
-                        yield DataStreamStartPart(self._message_id).format()
-                        yield DataStreamStartStepPart().format()
-                        yield DataStreamTextStartPart(self._text_id).format()
-                        self._message_started = True
-                    yield DataStreamTextDeltaPart(
-                        self._text_id, message.content
-                    ).format()
+        node_name = metadata.get("langgraph_node")
+        
+        # Only stream AIMessages (including chunks)
+        from langchain_core.messages import AIMessage
+        if not isinstance(message, AIMessage):
+            return
+
+        # Explicitly block tool calls from streaming to text
+        if hasattr(message, "tool_calls") and message.tool_calls:
+            return
+
+        is_streamable = False
+        if self._messages_streamable_nodes is not None:
+            # We only want to stream from the PRIMARY conversational nodes.
+            # Usually named 'agent' inside a react agent subgraph, or the node name itself.
+            # We must be careful not to allow 'tools' nodes to stream their internal LLM tokens.
+            allowed_node_names = ["agent", "chatbot", "chatbot_node"]
+            
+            if node_name in allowed_node_names:
+                # If it's a direct match or matches an allowed base name
+                if node_name in self._messages_streamable_nodes:
+                    is_streamable = True
+                
+                # If it's inside a subgraph, check if the subgraph is in streamable nodes
+                if not is_streamable and namespace:
+                    for ns_item in namespace:
+                        if isinstance(ns_item, str):
+                            base_ns = ns_item.split(":")[0]
+                            if base_ns in self._messages_streamable_nodes:
+                                is_streamable = True
+                                break
         else:
-            if hasattr(message, "content") and message.content:
-                if not self._message_started:
-                    yield DataStreamStartPart(self._message_id).format()
-                    yield DataStreamStartStepPart().format()
-                    yield DataStreamTextStartPart(self._text_id).format()
-                    self._message_started = True
-                yield DataStreamTextDeltaPart(self._text_id, message.content).format()
+            is_streamable = True
+
+        # Safety check: if content looks like raw JSON data (starts with {), skip it.
+        # This prevents internal data extraction from leaking as text deltas.
+        if is_streamable and hasattr(message, "content") and message.content:
+            content = message.content.strip()
+            if content.startswith("{") and content.endswith("}"):
+                # Likely JSON data, probably should have been a custom part.
+                return
+
+            if not self._message_started:
+                yield DataStreamStartPart(self._message_id).format()
+                yield DataStreamStartStepPart().format()
+                yield DataStreamTextStartPart(self._text_id).format()
+                self._message_started = True
+            yield DataStreamTextDeltaPart(
+                self._text_id, message.content
+            ).format()
 
     def _stream_custom_data(self, step: Dict[str, Any]):
         if len(self._custom_data_stream_config) > 0:
