@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 type HotelItem = {
   city: string;
   name: string;
@@ -10,9 +12,10 @@ export default function HotelsGrid({ items }: { items: HotelItem[] }) {
   return (
     <div className="grid md:grid-cols-3 gap-5">
       {items.map((h, i) => (
-        <div
+        <Link
           key={i}
-          className="rounded-xl overflow-hidden ring-1 ring-black/5 bg-white hover:shadow transition"
+          href={`/pages/hotel-results?destination=${encodeURIComponent(h.city)}`}
+          className="rounded-xl overflow-hidden ring-1 ring-black/5 bg-white hover:shadow-md hover:-translate-y-0.5 transition block cursor-pointer"
         >
           <img src={h.img} alt={h.name} className="h-48 w-full object-cover" />
           <div className="p-4">
@@ -23,7 +26,7 @@ export default function HotelsGrid({ items }: { items: HotelItem[] }) {
               <span className="text-slate-600">{h.reviews} đánh giá</span>
             </div>
           </div>
-        </div>
+        </Link>
       ))}
     </div>
   );

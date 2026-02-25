@@ -16,6 +16,8 @@ export async function storeToken(
     value: request.accessToken,
     maxAge: 60 * 60 * 24 * 1,  // 1 day
     httpOnly: true,
+    path: "/",
+    sameSite: "lax",
   });
 
   if (rememberMe) {
@@ -24,12 +26,16 @@ export async function storeToken(
       value: request.refreshToken,
       maxAge: 60 * 60 * 24 * 7,  // 1 week
       httpOnly: true,
+      path: "/",
+      sameSite: "lax",
     });
   } else {
     (await cookies()).set({
       name: "refresh_token",
       value: request.refreshToken,
       httpOnly: true,
+      path: "/",
+      sameSite: "lax",
     });
   }
 }

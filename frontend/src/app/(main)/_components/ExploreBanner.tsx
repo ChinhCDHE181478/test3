@@ -20,7 +20,7 @@ export default function ExploreBanner() {
             Khám phá điểm đến trong mơ
           </div>
           <Link
-            href="/pages/explore"
+            href="/pages/flights"
             className="inline-block mt-6 px-5 py-3 rounded-lg bg-[#0891b2] hover:brightness-110 font-semibold"
           >
             Tìm vé máy bay đi Mọi nơi
