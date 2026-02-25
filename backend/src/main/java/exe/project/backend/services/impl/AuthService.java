@@ -266,7 +266,7 @@ public class AuthService implements IAuthService {
                             .userId(newUser.getId())
                             .build();
                     // Chưa có subscription hoặc đã hết hạn -> expiredAt = now + duration
-                    subscription.setExpiredAt(now.plusDays(3));
+                    subscription.setExpiredAt(now.plusDays(1));
 
                     subscriptionRepository.save(subscription);
                     return newUser;
