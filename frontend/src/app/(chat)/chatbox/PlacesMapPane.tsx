@@ -196,7 +196,9 @@ export default function PlacesMapPane({
       });
       marker.on("click", () => onSelectPlace?.(p.place_id));
 
-      const gmapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(p.name)}`;
+      const hasCoords = Number.isFinite(p.lat) && Number.isFinite(p.lng);
+      const gmapsQuery = hasCoords ? `${p.lat},${p.lng}` : p.name;
+      const gmapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(gmapsQuery)}`;
       
       marker.bindPopup(`
         <div style="font-family: sans-serif; min-width: 200px; padding: 4px;">

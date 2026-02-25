@@ -67,9 +67,9 @@ type PromptTutorialStep = {
 
 function formatVND(n: number) {
   try {
-    return n.toLocaleString("vi-VN") + "đ";
+    return n.toLocaleString("vi-VN") + "Đ";
   } catch {
-    return `${n}đ`;
+    return `${n}Đ`;
   }
 }
 
@@ -438,52 +438,70 @@ function VivuplanPremiumContent() {
     return (random - 0.5) * 0.04; // Spread within ~4km
   };
 
+  const normalizeVietnamese = (text: string) =>
+    text
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/đ/g, "d")
+      .replace(/Đ/g, "D")
+      .toLowerCase()
+      .trim();
+
   const CITY_COORDS: Record<string, { lat: number; lng: number }> = {
-    "hà nội": { lat: 21.0285, lng: 105.8542 },
+    "ha noi": { lat: 21.0285, lng: 105.8542 },
     "hcm": { lat: 10.8231, lng: 106.6297 },
-    "hồ chí minh": { lat: 10.8231, lng: 106.6297 },
-    "đà nẵng": { lat: 16.0544, lng: 108.2022 },
-    "đà lạt": { lat: 11.9404, lng: 108.4583 },
+    "ho chi minh": { lat: 10.8231, lng: 106.6297 },
+    "da nang": { lat: 16.0544, lng: 108.2022 },
+    "da lat": { lat: 11.9404, lng: 108.4583 },
     "nha trang": { lat: 12.2388, lng: 109.1967 },
-    "phú quốc": { lat: 10.2899, lng: 103.9840 },
-    "huế": { lat: 16.4637, lng: 107.5909 },
-    "hội an": { lat: 15.8801, lng: 108.3380 },
+    "phu quoc": { lat: 10.2899, lng: 103.984 },
+    "hue": { lat: 16.4637, lng: 107.5909 },
+    "hoi an": { lat: 15.8801, lng: 108.338 },
     "sapa": { lat: 22.3364, lng: 103.8438 },
-    "hạ long": { lat: 20.9501, lng: 107.0734 },
-    "vũng tàu": { lat: 10.3460, lng: 107.0843 },
-    "cần thơ": { lat: 10.0452, lng: 105.7469 },
-    "quy nhơn": { lat: 13.7830, lng: 109.2197 },
+    "ha long": { lat: 20.9501, lng: 107.0734 },
+    "vung tau": { lat: 10.346, lng: 107.0843 },
+    "can tho": { lat: 10.0452, lng: 105.7469 },
+    "quy nhon": { lat: 13.783, lng: 109.2197 },
   };
 
   const places: UiPlace[] = useMemo(() => {
     if (isStreaming) return []; // Only show places when streaming is finished
     if (!itineraryData?.itinerary) return [];
+
     const out: UiPlace[] = [];
-    itineraryData.itinerary.forEach((day: any) => {
-      const locationKey = day.location?.toLowerCase().trim() || "";
-      // Find closest city match
-      const cityMatch = Object.keys(CITY_COORDS).find(k => locationKey.includes(k));
-      const baseCoords = cityMatch ? CITY_COORDS[cityMatch] : { lat: 21.0285, lng: 105.8542 }; // Default Hanoi
 
-      const items = [...(day.attraction_recommendations || []), ...(day.restaurant_recommendations || [])];
-      items.forEach((item: any) => {
-        let shortName = item.reason?.split(/[.\-:]/)[0] || "Địa điểm";
-        shortName = shortName.split(/ mang | là | giúp | lý | có | được | để /)[0].trim();
+    itineraryData.itinerary.forEach((day: any, dayIndex: number) => {
+      const locationKey = normalizeVietnamese(day.location || "");
+      const cityMatch = Object.keys(CITY_COORDS).find((k) => locationKey.includes(k));
+      const baseCoords = cityMatch ? CITY_COORDS[cityMatch] : { lat: 21.0285, lng: 105.8542 };
 
-        // Use name or place_id as seed for stable position
-        const seed = item.place_id || item.name || shortName;
+      const pushPlaces = (items: any[], kind: UiPlace["kind"], section: string) => {
+        items.forEach((item: any, itemIndex: number) => {
+          let shortName = item.name || item.reason?.split(/[.\-:]/)[0] || "Địa điểm";
+          shortName = shortName
+            .split(/ mang | là | giúp | lý | có | được | để /)[0]
+            .trim();
+          if (!shortName) shortName = "Địa điểm";
 
-        out.push({
-          id: item.place_id, place_id: item.place_id, name: shortName,
-          kind: item.reason?.toLowerCase().includes("ăn") ? "restaurant" : "attraction",
-          day: day.date_,
-          lat: baseCoords.lat + getStableOffset(seed + "lat"),
-          lng: baseCoords.lng + getStableOffset(seed + "lng"),
-          reason: item.reason,
+          const seed = String(item.place_id || item.name || shortName);
+          const placeId = String(item.place_id || `${day.date_ || dayIndex}-${section}-${itemIndex}-${seed}`);
+
+          out.push({
+            id: placeId,
+            place_id: placeId,
+            name: shortName,
+            kind,
+            day: day.date_,
+            lat: baseCoords.lat + getStableOffset(`${placeId}-lat`),
+            lng: baseCoords.lng + getStableOffset(`${placeId}-lng`),
+            reason: item.reason,
+          });
         });
-      });
+      };
 
-      // Map meals
+      pushPlaces(day.attraction_recommendations || [], "attraction", "attr");
+      pushPlaces(day.restaurant_recommendations || [], "restaurant", "rest");
+
       if (day.meals && Array.isArray(day.meals)) {
         day.meals.forEach((meal: string, i: number) => {
           if (!meal) return;
@@ -501,6 +519,7 @@ function VivuplanPremiumContent() {
         });
       }
     });
+
     return out;
   }, [itineraryData, isStreaming]);
 
@@ -1328,4 +1347,5 @@ export default function VivuplanPremiumApp() {
     </Suspense>
   );
 }
+
 
