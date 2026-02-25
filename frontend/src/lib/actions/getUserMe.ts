@@ -37,7 +37,7 @@ async function refreshAccessToken(): Promise<string | null> {
         cookieStore.set({
             name: "access_token",
             value: accessToken,
-            maxAge: 60 * 60 * 24, // 1 day
+            maxAge: 259200, // 1 day
             httpOnly: true,
         });
 
@@ -45,7 +45,7 @@ async function refreshAccessToken(): Promise<string | null> {
             cookieStore.set({
                 name: "refresh_token",
                 value: newRefreshToken,
-                maxAge: 60 * 60 * 24 * 7, // 7 days
+                maxAge: 259200, // 7 days
                 httpOnly: true,
             });
         }

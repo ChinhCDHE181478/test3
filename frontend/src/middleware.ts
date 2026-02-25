@@ -103,14 +103,14 @@ export async function middleware(request: NextRequest) {
           response.cookies.set("access_token", result.accessToken, {
             path: "/",
             httpOnly: true,
-            maxAge: 60 * 60 * 24, // 1 ngày
+            maxAge: 259200, // 1 ngày
           });
 
           if (result.refreshToken) {
             response.cookies.set("refresh_token", result.refreshToken, {
               path: "/",
               httpOnly: true,
-              maxAge: 60 * 60 * 24 * 7, // 7 ngày
+              maxAge: 259200, // 7 ngày
             });
           }
         }

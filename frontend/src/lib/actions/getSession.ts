@@ -75,7 +75,7 @@ export async function getSession(): Promise<UserSession | null> {
             cookieStore.set({
                 name: "access_token",
                 value: newAccessToken,
-                maxAge: 60 * 60 * 24, // 1 day (adjust as needed)
+                maxAge: 259200,
                 httpOnly: true,
                 path: "/",
             });
@@ -84,7 +84,7 @@ export async function getSession(): Promise<UserSession | null> {
                 cookieStore.set({
                     name: "refresh_token",
                     value: newRefreshToken,
-                    maxAge: 60 * 60 * 24 * 7, // 7 days (adjust as needed)
+                    maxAge: 259200, // 7 days (adjust as needed)
                     httpOnly: true,
                     path: "/",
                 });
