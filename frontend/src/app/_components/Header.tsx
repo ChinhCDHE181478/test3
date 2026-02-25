@@ -16,6 +16,7 @@ export default function Header() {
   const [isScrolled, setIsScrolled] = useState(false);
 
   const nav = [
+    { href: "/", label: "Trang chủ" },
     { href: "/pages/flights", label: "Chuyến bay" },
     { href: "/pages/hotels", label: "Khách sạn" },
     { href: "/chatbox", label: "Lên lịch trình" },

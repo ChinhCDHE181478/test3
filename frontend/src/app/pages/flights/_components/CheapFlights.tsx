@@ -1,4 +1,5 @@
 "use client";
+import Link from "next/link";
 
 /* Popular */
 const popular = [
@@ -85,9 +86,10 @@ export default function CheapFlights() {
 
           <div className="grid sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-5">
             {popular.map((p, i) => (
-              <div
+              <Link
                 key={i}
-                className="group overflow-hidden rounded-2xl ring-1 ring-black/5 bg-white"
+                href="/pages/flights"
+                className="group overflow-hidden rounded-2xl ring-1 ring-black/5 bg-white block cursor-pointer transition hover:shadow-md hover:-translate-y-0.5"
               >
                 <div className="relative h-56">
                   <img
@@ -100,7 +102,7 @@ export default function CheapFlights() {
                     <div className="text-sm opacity-90">{p.country}</div>
                   </div>
                 </div>
-              </div>
+              </Link>
             ))}
           </div>
         </div>

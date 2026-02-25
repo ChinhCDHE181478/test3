@@ -39,6 +39,7 @@ import { useAuth } from "../../AuthProvider";
 
 const API_BASE = process.env.NEXT_PUBLIC_AGENT_API!;
 const SPRING_BOOT_API = process.env.NEXT_PUBLIC_API_URL!;
+const PROMPT_TUTORIAL_STORAGE_KEY = "vivuplan_prompt_tutorial_done";
 
 const SUB_PACKAGES = [
   { id: 1, packageCode: "day", name: "Gói 1 ngày", days: 1, price: 10000 },
@@ -55,6 +56,13 @@ type SubscriptionCheckResult = {
   active: boolean;
   packageCode: string | null;
   error?: boolean;
+};
+
+type PromptTutorialStep = {
+  id: string;
+  title: string;
+  description: string;
+  targetRef: React.RefObject<HTMLElement | null>;
 };
 
 function formatVND(n: number) {
@@ -152,6 +160,18 @@ function VivuplanPremiumContent() {
   const [isLoading, setIsLoading] = useState(false);
   const [viewMode, setViewMode] = useState<"chat" | "itinerary" | "hotel">("chat");
   const scrollRef = useRef<HTMLDivElement>(null);
+  const quickPromptBtnRef = useRef<HTMLButtonElement>(null);
+  const promptTabsRef = useRef<HTMLDivElement>(null);
+  const promptInputRef = useRef<HTMLTextAreaElement>(null);
+  const sendPromptBtnRef = useRef<HTMLButtonElement>(null);
+  const [isPromptTutorialOpen, setIsPromptTutorialOpen] = useState(false);
+  const [promptTutorialStep, setPromptTutorialStep] = useState(0);
+  const [promptTutorialRect, setPromptTutorialRect] = useState<{
+    top: number;
+    left: number;
+    width: number;
+    height: number;
+  } | null>(null);
 
   const [isStreaming, setIsStreaming] = useState(false);
 
@@ -195,6 +215,56 @@ function VivuplanPremiumContent() {
   const [isAccessCheckLoading, setIsAccessCheckLoading] = useState(true);
   const [isSubStatusResolved, setIsSubStatusResolved] = useState(false);
   const [subStatusError, setSubStatusError] = useState<string | null>(null);
+  const promptTutorialSteps: PromptTutorialStep[] = useMemo(
+    () => [
+      {
+        id: "quick-prompt",
+        title: "B\u01b0\u1edbc 1: M\u1edf form t\u1ea1o nhanh",
+        description:
+          "B\u1ea5m n\u00fat h\u00ecnh c\u00e2y b\u00fat \u0111\u1ec3 m\u1edf form t\u1ea1o nhanh. \u1ede b\u01b0\u1edbc n\u00e0y b\u1ea1n ch\u1ec9 c\u1ea7n bi\u1ebft v\u1ecb tr\u00ed c\u1ee7a n\u00fat n\u00e0y.",
+        targetRef: quickPromptBtnRef,
+      },
+      {
+        id: "prompt-tabs",
+        title: "B\u01b0\u1edbc 2: Ch\u1ecdn tab L\u1ecbch tr\u00ecnh ho\u1eb7c Kh\u00e1ch s\u1ea1n",
+        description:
+          "Sau khi m\u1edf form, h\u00e3y ch\u1ecdn \u0111\u00fang tab theo nhu c\u1ea7u: L\u1ecbch tr\u00ecnh cho k\u1ebf ho\u1ea1ch \u0111i ch\u01a1i, Kh\u00e1ch s\u1ea1n \u0111\u1ec3 t\u00ecm n\u01a1i l\u01b0u tr\u00fa.",
+        targetRef: promptTabsRef,
+      },
+      {
+        id: "prompt-input",
+        title: "B\u01b0\u1edbc 3: Nh\u1eadp prompt",
+        description:
+          "B\u1ea1n c\u00f3 th\u1ec3 nh\u1eadp prompt tr\u1ef1c ti\u1ebfp t\u1ea1i \u00f4 n\u00e0y. V\u00ed d\u1ee5: \"L\u1eadp l\u1ecbch tr\u00ecnh \u0110\u00e0 L\u1ea1t 3 ng\u00e0y 2 \u0111\u00eam cho 2 ng\u01b0\u1eddi, ng\u00e2n s\u00e1ch 5 tri\u1ec7u\".",
+        targetRef: promptInputRef,
+      },
+      {
+        id: "send",
+        title: "B\u01b0\u1edbc 4: G\u1eedi prompt",
+        description:
+          "Nh\u1ea5n n\u00fat m\u0169i t\u00ean \u0111\u1ec3 g\u1eedi y\u00eau c\u1ea7u. B\u1ea1n c\u0169ng c\u00f3 th\u1ec3 nh\u1ea5n Enter \u0111\u1ec3 g\u1eedi nhanh.",
+        targetRef: sendPromptBtnRef,
+      },
+    ],
+    []
+  );
+
+  const closePromptTutorial = () => {
+    setIsPromptTutorialOpen(false);
+    setPromptTutorialRect(null);
+    if (typeof window !== "undefined") {
+      localStorage.setItem(PROMPT_TUTORIAL_STORAGE_KEY, "1");
+    }
+  };
+
+  const goToPromptTutorialStep = (nextStep: number) => {
+    if (nextStep < 0) return;
+    if (nextStep >= promptTutorialSteps.length) {
+      closePromptTutorial();
+      return;
+    }
+    setPromptTutorialStep(nextStep);
+  };
 
   const newSessionId = () => {
     try {
@@ -625,12 +695,72 @@ function VivuplanPremiumContent() {
     }
   }, [subStatus.active, subStatusError]);
 
+  useEffect(() => {
+    if (!mounted || isAuthLoading || isAccessCheckLoading) return;
+    if (typeof window === "undefined") return;
+    const hasSeenTutorial = localStorage.getItem(PROMPT_TUTORIAL_STORAGE_KEY) === "1";
+    if (!hasSeenTutorial) {
+      setIsPromptPopoverOpen(false);
+      setPromptTutorialStep(0);
+      setIsPromptTutorialOpen(true);
+    }
+  }, [mounted, isAuthLoading, isAccessCheckLoading]);
+
+  useEffect(() => {
+    if (!isPromptTutorialOpen) return;
+    if (promptTutorialStep <= 0) {
+      setIsPromptPopoverOpen(false);
+    } else {
+      setIsPromptPopoverOpen(true);
+    }
+  }, [isPromptTutorialOpen, promptTutorialStep]);
+
+  useEffect(() => {
+    if (!isPromptTutorialOpen) return;
+    const currentStep = promptTutorialSteps[promptTutorialStep];
+    const targetElement = currentStep?.targetRef.current;
+    if (!targetElement) return;
+    targetElement.scrollIntoView({
+      behavior: "smooth",
+      block: "center",
+      inline: "nearest",
+    });
+  }, [isPromptTutorialOpen, promptTutorialStep, isPromptPopoverOpen, promptTutorialSteps]);
+
+  useEffect(() => {
+    if (!isPromptTutorialOpen) return;
+    const updateRect = () => {
+      const currentStep = promptTutorialSteps[promptTutorialStep];
+      const targetElement = currentStep?.targetRef.current;
+      if (!targetElement) {
+        setPromptTutorialRect(null);
+        return;
+      }
+      const rect = targetElement.getBoundingClientRect();
+      setPromptTutorialRect({
+        top: rect.top,
+        left: rect.left,
+        width: rect.width,
+        height: rect.height,
+      });
+    };
+
+    const raf = window.requestAnimationFrame(updateRect);
+    window.addEventListener("resize", updateRect);
+    window.addEventListener("scroll", updateRect, true);
+    return () => {
+      window.cancelAnimationFrame(raf);
+      window.removeEventListener("resize", updateRect);
+      window.removeEventListener("scroll", updateRect, true);
+    };
+  }, [isPromptTutorialOpen, promptTutorialStep, isPromptPopoverOpen, inputText, promptTutorialSteps]);
+
   const LoginGateModal = () => (
     <div className="fixed inset-0 z-[20000] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
       <div className="w-full max-w-md bg-white rounded-3xl shadow-2xl border border-slate-100 overflow-hidden">
         <div className="p-5 border-b flex items-center justify-between">
           <div className="flex items-center gap-3"><div className="w-10 h-10 rounded-2xl bg-blue-50 text-[#0056D2] flex items-center justify-center"><ShieldAlert size={20} /></div><div><p className="font-bold text-slate-800">Cần đăng nhập</p><p className="text-xs text-slate-500">Để lưu lịch trình & mua gói</p></div></div>
-          <button onClick={() => setShowLoginGate(false)}><X size={20} className="text-slate-400" /></button>
+          <button onClick={() => setShowLoginGate(false)} className="rounded-full p-1 hover:bg-slate-100 transition-colors"><X size={20} className="text-slate-400" /></button>
         </div>
         <button onClick={() => router.push("/pages/login?next=/")} className="w-full py-3 bg-[#0056D2] text-white rounded-xl font-bold flex justify-center gap-2 hover:bg-blue-700 transition-all"><LogIn size={18} /> Đăng nhập ngay</button>
       </div>
@@ -660,7 +790,7 @@ function VivuplanPremiumContent() {
               ))}
             </div>
             <div className="mt-6 pt-6 border-t border-slate-100">
-              {!isAuth && <div className="flex items-center justify-between gap-2 mb-3 bg-amber-50 p-2 rounded-lg text-amber-700 text-xs font-bold border border-amber-100"><span>⚠️ Cần đăng nhập để mua</span><button onClick={() => router.push("/pages/login")} className="underline uppercase text-[10px]">Đăng nhập</button></div>}
+              {!isAuth && <div className="flex items-center justify-between gap-2 mb-3 bg-amber-50 p-2 rounded-lg text-amber-700 text-xs font-bold border border-amber-100"><span>⚠️ Cần đăng nhập để mua</span><button onClick={() => router.push("/pages/login")} className="underline uppercase text-[10px] hover:text-amber-900 transition-colors">Đăng nhập</button></div>}
               {isPurchasing ? <button disabled className="w-full py-3 rounded-xl bg-slate-100 text-slate-400 font-bold flex items-center justify-center gap-2 cursor-not-allowed"><Loader2 size={16} className="animate-spin" /> Đang xử lý...</button> : <button onClick={onCheckStatus} disabled={!isAuth} className="w-full py-3 rounded-xl border border-slate-200 text-slate-600 text-xs font-bold uppercase tracking-wide hover:bg-slate-50 disabled:opacity-50 flex items-center justify-center gap-2"><CreditCard size={14} /> Kiểm tra thanh toán</button>}
               <p className="text-[10px] text-center text-slate-400 mt-3 font-medium">* Thanh toán an toàn qua cổng PayOS / VNPay.</p>
             </div>
@@ -689,6 +819,109 @@ function VivuplanPremiumContent() {
     </div>
   );
 
+  const PromptTutorialLayer = () => {
+    if (!isPromptTutorialOpen) return null;
+    const currentStep = promptTutorialSteps[promptTutorialStep];
+    const rect = promptTutorialRect;
+
+    const CARD_WIDTH = 360;
+    const CARD_HEIGHT = 232;
+    const SAFE_PADDING = 16;
+    const ANCHOR_GAP = 14;
+
+    let cardTop = 96;
+    let cardLeft = 16;
+    if (rect && typeof window !== "undefined") {
+      const viewportWidth = window.innerWidth;
+      const viewportHeight = window.innerHeight;
+
+      const rectBottom = rect.top + rect.height;
+      const rectRight = rect.left + rect.width;
+      const spaceBelow = viewportHeight - rectBottom;
+      const spaceAbove = rect.top;
+
+      if (spaceBelow >= CARD_HEIGHT + ANCHOR_GAP) {
+        cardTop = rectBottom + ANCHOR_GAP;
+      } else if (spaceAbove >= CARD_HEIGHT + ANCHOR_GAP) {
+        cardTop = rect.top - CARD_HEIGHT - ANCHOR_GAP;
+      } else {
+        cardTop = (viewportHeight - CARD_HEIGHT) / 2;
+      }
+
+      const preferLeft = rect.left;
+      const preferRight = rectRight - CARD_WIDTH;
+      const centered = rect.left + rect.width / 2 - CARD_WIDTH / 2;
+
+      if (preferLeft + CARD_WIDTH <= viewportWidth - SAFE_PADDING) {
+        cardLeft = preferLeft;
+      } else if (preferRight >= SAFE_PADDING) {
+        cardLeft = preferRight;
+      } else {
+        cardLeft = centered;
+      }
+
+      cardTop = Math.min(
+        Math.max(cardTop, SAFE_PADDING + 56),
+        viewportHeight - CARD_HEIGHT - SAFE_PADDING
+      );
+      cardLeft = Math.min(
+        Math.max(cardLeft, SAFE_PADDING),
+        viewportWidth - CARD_WIDTH - SAFE_PADDING
+      );
+    }
+
+    return (
+      <div className="fixed inset-0 z-[35000] bg-slate-950/45 backdrop-blur-[1.5px]">
+        {rect && (
+          <div
+            className="fixed rounded-2xl border-2 border-cyan-300/90 shadow-[0_0_0_9999px_rgba(15,23,42,0.35)] pointer-events-none"
+            style={{
+              top: rect.top - 6,
+              left: rect.left - 6,
+              width: rect.width + 12,
+              height: rect.height + 12,
+            }}
+          />
+        )}
+
+        <div
+          className="fixed w-[360px] max-w-[calc(100vw-24px)] rounded-2xl bg-white p-4 shadow-2xl border border-slate-200"
+          style={{ top: cardTop, left: cardLeft }}
+        >
+          <div className="text-[11px] font-black uppercase tracking-wider text-[#0056D2]">
+            Hướng dẫn sử dụng prompt
+          </div>
+          <h4 className="mt-1 text-sm font-bold text-slate-900">{currentStep?.title}</h4>
+          <p className="mt-2 text-xs text-slate-600 leading-relaxed">{currentStep?.description}</p>
+
+          <div className="mt-4 flex items-center justify-between gap-2">
+            <button
+              onClick={closePromptTutorial}
+              className="px-3 py-2 text-[11px] font-bold rounded-lg text-slate-500 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+            >
+              Bỏ qua
+            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => goToPromptTutorialStep(promptTutorialStep - 1)}
+                disabled={promptTutorialStep === 0}
+                className="px-3 py-2 text-[11px] font-bold rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-40 transition-all"
+              >
+                Quay lại
+              </button>
+              <button
+                onClick={() => goToPromptTutorialStep(promptTutorialStep + 1)}
+                className="px-3 py-2 text-[11px] font-bold rounded-lg bg-[#0056D2] text-white hover:bg-blue-700 transition-colors"
+              >
+                {promptTutorialStep === promptTutorialSteps.length - 1 ? "Bắt đầu dùng" : "Tiếp theo"}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   if (!mounted || isAuthLoading || isAccessCheckLoading) {
     return (
       <div className="fixed inset-0 top-[68px] w-screen h-[calc(100dvh-68px)] bg-white flex items-center justify-center">
@@ -701,9 +934,10 @@ function VivuplanPremiumContent() {
   }
 
   return (
-    <div className="fixed inset-0 top-[68px] w-screen h-[calc(100dvh-68px)] bg-white text-slate-900 font-sans flex overflow-hidden text-sm shadow-inner">
+    <div className="fixed inset-0 top-[68px] w-screen h-[calc(100dvh-68px)] bg-white text-slate-900 font-sans flex overflow-hidden text-sm shadow-inner [&_button]:cursor-pointer [&_button:disabled]:cursor-not-allowed">
       {showLoginGate && <LoginGateModal />}
       {showPaywall && !isAccessCheckLoading && !subStatusError && !subStatus.active && <PaywallModal isOpen={showPaywall} onClose={() => setShowPaywall(false)} isAuthenticated={isAuthenticated} subStatus={subStatus} isPurchasing={isPurchasing} onPurchase={purchaseSubscription} onCheckStatus={handleCheckPaymentStatus} />}
+      <PromptTutorialLayer />
 
       {/* SIDEBAR */}
       <aside className={`absolute md:relative inset-y-0 left-0 z-[3000] w-[280px] bg-white border-r border-slate-100 flex flex-col transition-transform duration-300 shadow-2xl md:shadow-none ${isSidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"}`}>
@@ -725,7 +959,7 @@ function VivuplanPremiumContent() {
                 <div className="h-full flex flex-col items-center justify-center text-center space-y-6 max-w-md mx-auto py-10"><div className="w-16 h-16 bg-blue-50 rounded-[2rem] flex items-center justify-center text-[#0056D2] animate-bounce shadow-lg shadow-blue-50"><Sparkles size={32} /></div><h2 className="text-xl md:text-2xl font-black italic tracking-tighter uppercase mb-2 text-[#0056D2]">Xin chào!</h2><div className="grid grid-cols-1 md:grid-cols-2 gap-2 w-full px-4">{["Đà Lạt 3N2Đ", "Huế ăn gì?", "Resort Nha Trang"].map((t, i) => (<button key={i} onClick={() => setInputText(t)} className="p-3 border border-slate-100 rounded-xl text-[10px] font-black uppercase tracking-widest text-slate-500 hover:bg-blue-50 hover:text-[#0056D2] hover:border-blue-100 transition-all text-left">{t}</button>))}</div></div>
               ) : (
                 <div className="max-w-3xl mx-auto w-full space-y-6 pb-4">
-                  {messages.map((m, i) => (<div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"} animate-in slide-in-from-bottom-2 duration-300`}><div className={`max-w-[90%] md:max-w-[85%] p-4 rounded-2xl text-[13px] leading-relaxed shadow-sm ${m.role === "user" ? "bg-[#0056D2] text-white rounded-tr-none" : "bg-white text-slate-700 border border-slate-100 rounded-tl-none font-medium"}`}>{m.content}</div></div>))}
+                  {messages.map((m, i) => (<div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"} animate-in slide-in-from-bottom-2 duration-300`}><div className={`max-w-[90%] md:max-w-[85%] p-4 rounded-2xl text-[13px] leading-relaxed shadow-sm whitespace-pre-line break-words ${m.role === "user" ? "bg-[#0056D2] text-white rounded-tr-none" : "bg-white text-slate-700 border border-slate-100 rounded-tl-none font-medium"}`}>{m.content}</div></div>))}
                   {isLoading && (<div className="flex justify-start"><div className="bg-white border border-blue-50 p-4 rounded-2xl rounded-tl-none shadow-md flex items-center gap-3"><Loader2 size={16} className="animate-spin text-[#0056D2]" /><p className="text-[10px] font-black uppercase tracking-widest text-[#0056D2]">Đang xử lý...</p></div></div>)}
                 </div>
               )}
@@ -735,25 +969,32 @@ function VivuplanPremiumContent() {
             <div className="bg-white border-t border-slate-50 shrink-0 relative z-20 flex flex-col">
               {(itineraryData || hotelData) && (
                 <div className="px-4 py-2 flex gap-2 overflow-x-auto no-scrollbar justify-center border-b border-slate-50 bg-slate-50/50">
-                  {itineraryData && <button onClick={() => setViewMode("itinerary")} className="flex items-center gap-2 px-5 py-2 bg-[#0056D2] text-white rounded-full text-[10px] font-black uppercase tracking-widest shadow-md hover:bg-blue-700 active:scale-95 transition-all whitespace-nowrap"><Calendar size={14} /> Xem Lịch Trình</button>}
-                  {hotelData && <button onClick={() => setViewMode("hotel")} className="flex items-center gap-2 px-5 py-2 bg-cyan-500 text-white rounded-full text-[10px] font-black uppercase tracking-widest shadow-md hover:bg-cyan-600 active:scale-95 transition-all whitespace-nowrap"><Hotel size={14} /> Xem Khách sạn</button>}
+                  {itineraryData && <button onClick={() => setViewMode("itinerary")} className="flex items-center gap-2 px-5 py-2 bg-[#0056D2] text-white rounded-full text-[10px] font-black uppercase tracking-widest shadow-md hover:bg-blue-700 hover:-translate-y-0.5 hover:shadow-lg active:translate-y-0 active:scale-95 transition-all duration-200 whitespace-nowrap"><Calendar size={14} /> Xem Lịch Trình</button>}
+                  {hotelData && <button onClick={() => setViewMode("hotel")} className="flex items-center gap-2 px-5 py-2 bg-cyan-500 text-white rounded-full text-[10px] font-black uppercase tracking-widest shadow-md hover:bg-cyan-600 hover:-translate-y-0.5 hover:shadow-lg active:translate-y-0 active:scale-95 transition-all duration-200 whitespace-nowrap"><Hotel size={14} /> Xem Khách sạn</button>}
                 </div>
               )}
               <div className="p-3 md:p-6 relative">
                 {isPromptPopoverOpen && (
                   <div className="absolute bottom-full left-0 w-full px-3 md:px-6 pb-2 animate-in slide-in-from-bottom-4 z-50">
-                    <div className="max-w-3xl mx-auto bg-white rounded-2xl shadow-2xl border border-slate-200 p-4 relative">
+                    <div className="max-w-3xl mx-auto bg-white rounded-3xl shadow-2xl border border-blue-100 p-5 md:p-6 relative">
                       <button onClick={() => setIsPromptPopoverOpen(false)} className="absolute top-3 right-3 text-slate-300 hover:text-red-500"><X size={16} /></button>
-                      <h3 className="text-xs font-black italic uppercase text-[#0056D2] mb-3 flex items-center gap-2"><Sparkle size={14} /> Tạo nhanh</h3>
+                      <h3 className="text-sm font-black italic uppercase text-[#0056D2] mb-4 flex items-center gap-2"><Sparkle size={14} /> Tạo nhanh</h3>
 
                       {/* Tabs */}
-                      <div className="flex bg-slate-100 p-1 rounded-xl mb-4">
-                        <button onClick={() => setQuickMode("itinerary")} className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${quickMode === "itinerary" ? "bg-white text-[#0056D2] shadow-sm" : "text-slate-500 hover:text-slate-700"}`}>Lịch trình</button>
-                        <button onClick={() => setQuickMode("hotel")} className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${quickMode === "hotel" ? "bg-white text-[#0056D2] shadow-sm" : "text-slate-500 hover:text-slate-700"}`}>Khách sạn</button>
+                      <div ref={promptTabsRef} className="flex bg-slate-100 p-1 rounded-xl mb-4">
+                        <button onClick={() => setQuickMode("itinerary")} className={`flex-1 py-2.5 rounded-lg text-xs font-bold transition-all ${quickMode === "itinerary" ? "bg-white text-[#0056D2] shadow-sm" : "text-slate-500 hover:text-slate-700"}`}>Lịch trình</button>
+                        <button onClick={() => setQuickMode("hotel")} className={`flex-1 py-2.5 rounded-lg text-xs font-bold transition-all ${quickMode === "hotel" ? "bg-white text-[#0056D2] shadow-sm" : "text-slate-500 hover:text-slate-700"}`}>Khách sạn</button>
                       </div>
 
                       {quickMode === "itinerary" ? (
                         <div className="space-y-4">
+                          <div className="rounded-2xl border border-blue-100 bg-blue-50/60 px-4 py-3">
+                            <p className="text-[10px] uppercase tracking-widest font-black text-[#0056D2] mb-1">Ngày dự kiến</p>
+                            <p className="text-sm font-black text-slate-700">
+                              {itineraryForm.startDate || "Chưa chọn ngày đi"} {" -> "} {itineraryForm.endDate || "Chưa chọn ngày về"}
+                            </p>
+                          </div>
+
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                             <div className="space-y-1">
                               <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Điểm xuất phát</label>
@@ -765,14 +1006,14 @@ function VivuplanPremiumContent() {
                             </div>
                           </div>
 
-                          <div className="grid grid-cols-2 gap-3">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                             <div className="space-y-1">
                               <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Ngày đi</label>
-                              <input type="date" value={itineraryForm.startDate} onChange={(e) => setItineraryForm({ ...itineraryForm, startDate: e.target.value })} className="w-full bg-slate-50 border-none rounded-lg px-3 py-2 text-xs font-bold" />
+                              <input type="date" value={itineraryForm.startDate} onChange={(e) => setItineraryForm({ ...itineraryForm, startDate: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-bold" />
                             </div>
                             <div className="space-y-1">
                               <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Ngày về</label>
-                              <input type="date" value={itineraryForm.endDate} onChange={(e) => setItineraryForm({ ...itineraryForm, endDate: e.target.value })} className="w-full bg-slate-50 border-none rounded-lg px-3 py-2 text-xs font-bold" />
+                              <input type="date" value={itineraryForm.endDate} onChange={(e) => setItineraryForm({ ...itineraryForm, endDate: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-bold" />
                             </div>
                           </div>
 
@@ -828,14 +1069,26 @@ function VivuplanPremiumContent() {
                         </div>
                       )}
 
-                      <button onClick={handlePromptSubmit} className="w-full mt-4 bg-[#0056D2] text-white py-2.5 rounded-lg text-[10px] font-black uppercase hover:bg-blue-700 transition-all">
+                      <button onClick={handlePromptSubmit} className="w-full mt-4 bg-[#0056D2] text-white py-3 rounded-xl text-[10px] font-black uppercase hover:bg-blue-700 transition-all">
                         {quickMode === "itinerary" ? "Tạo lịch trình" : "Tìm khách sạn"}
                       </button>
                     </div>
                   </div>
                 )}
-                <div className="max-w-3xl mx-auto flex items-end gap-2"><button onClick={() => setIsPromptPopoverOpen(!isPromptPopoverOpen)} className={`h-12 w-12 rounded-2xl flex flex-col items-center justify-center border ${isPromptPopoverOpen ? "bg-blue-50 border-blue-200 text-[#0056D2]" : "bg-slate-50 border-transparent text-slate-400 hover:text-[#0056D2]"}`}><FilePenLine size={18} /></button><div className="relative flex-1"><textarea value={inputText} onChange={(e) => setInputText(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } }} className="w-full bg-slate-50 border-none rounded-2xl p-4 pr-12 text-[13px] h-12 md:h-14 resize-none outline-none focus:bg-white focus:ring-1 focus:ring-blue-200 transition-all font-medium shadow-inner" placeholder="Nhập yêu cầu..." /><button onClick={handleSend} disabled={isLoading} className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 md:w-10 md:h-10 bg-[#0056D2] text-white rounded-xl flex items-center justify-center hover:bg-blue-700 disabled:opacity-50"><Send size={16} /></button></div></div>
+                <div className="max-w-3xl mx-auto flex items-end gap-2"><button ref={quickPromptBtnRef} onClick={() => setIsPromptPopoverOpen(!isPromptPopoverOpen)} className={`h-12 w-12 rounded-2xl flex flex-col items-center justify-center border ${isPromptPopoverOpen ? "bg-blue-50 border-blue-200 text-[#0056D2]" : "bg-slate-50 border-transparent text-slate-400 hover:text-[#0056D2]"}`}><FilePenLine size={18} /></button><div className="relative flex-1"><textarea ref={promptInputRef} value={inputText} onChange={(e) => setInputText(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } }} className="w-full bg-slate-50 border-none rounded-2xl p-4 pr-12 text-[13px] h-12 md:h-14 resize-none outline-none focus:bg-white focus:ring-1 focus:ring-blue-200 transition-all font-medium shadow-inner" placeholder="Nhập yêu cầu..." /><button ref={sendPromptBtnRef} onClick={handleSend} disabled={isLoading} className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 md:w-10 md:h-10 bg-[#0056D2] text-white rounded-xl flex items-center justify-center hover:bg-blue-700 disabled:opacity-50"><Send size={16} /></button></div></div>
                 {!isAccessCheckLoading && isSubStatusResolved && !subStatusError && !subStatus.active && (<div className="max-w-3xl mx-auto mt-2 text-[10px] text-slate-400 flex items-center justify-between"><span>Chưa kích hoạt gói — tạo xong sẽ yêu cầu mua gói.</span><button onClick={() => setShowPaywall(true)} className="text-[#0056D2] font-black hover:underline">Xem gói</button></div>)}
+                <div className="max-w-3xl mx-auto mt-2 flex justify-end">
+                  <button
+                    onClick={() => {
+                      setIsPromptPopoverOpen(false);
+                      setPromptTutorialStep(0);
+                      setIsPromptTutorialOpen(true);
+                    }}
+                    className="text-[10px] font-black uppercase tracking-wider text-[#0056D2] hover:underline"
+                  >
+                    Xem hướng dẫn
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -1075,3 +1328,4 @@ export default function VivuplanPremiumApp() {
     </Suspense>
   );
 }
+

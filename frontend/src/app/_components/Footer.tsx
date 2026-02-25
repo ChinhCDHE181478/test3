@@ -12,7 +12,7 @@ export default function Footer() {
 
   return (
     <footer className="bg-[#0891b2]/10">
-      <div className="container mx-auto px-4 py-10 grid md:grid-cols-4 gap-8">
+      <div className="container mx-auto px-4 py-10 grid md:grid-cols-3 gap-8">
         <div>
           <Link href="/" className="inline-flex items-center">
             <img
@@ -28,22 +28,38 @@ export default function Footer() {
         </div>
 
         <div>
-          <div className="font-medium text-slate-900">Công ty</div>
+          <div className="font-medium text-slate-900">Tin du lịch địa phương</div>
           <ul className="mt-3 space-y-2 text-slate-700">
-            <li>Về chúng tôi</li>
-            <li>Nghề nghiệp</li>
-            <li>Báo chí</li>
-            <li>Blog</li>
-          </ul>
-        </div>
-
-        <div>
-          <div className="font-medium text-slate-900">Hỗ trợ</div>
-          <ul className="mt-3 space-y-2 text-slate-700">
-            <li>Trung tâm trợ giúp</li>
-            <li>Liên hệ</li>
-            <li>Chính sách huỷ</li>
-            <li>Điều khoản</li>
+            <li>
+              <a
+                href="https://vnexpress.net/du-lich"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hover:text-[#0891b2] transition-colors"
+              >
+                VnExpress Du lịch
+              </a>
+            </li>
+            <li>
+              <a
+                href="https://tuoitre.vn/du-lich.htm"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hover:text-[#0891b2] transition-colors"
+              >
+                Tuổi Trẻ Du lịch
+              </a>
+            </li>
+            <li>
+              <a
+                href="https://thanhnien.vn/du-lich.htm"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hover:text-[#0891b2] transition-colors"
+              >
+                Thanh Niên Du lịch
+              </a>
+            </li>
           </ul>
         </div>
 
@@ -53,7 +69,13 @@ export default function Footer() {
             Kết nối với chúng tôi
           </div>
           <div className="mt-3 flex items-center gap-4">
-            <a className="group" href="#" aria-label="Facebook">
+            <a
+              className="group"
+              href="https://www.facebook.com/profile.php?id=61586404334099"
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Facebook"
+            >
               <svg
                 viewBox="0 0 24 24"
                 className="h-6 w-6 text-slate-700 group-hover:text-[#0891b2]"
@@ -62,22 +84,19 @@ export default function Footer() {
                 <path d="M22 12a10 10 0 10-11.6 9.9v-7H7.7V12h2.7V9.8c0-2.7 1.6-4.2 4-4.2 1.2 0 2.5.2 2.5.2v2.7h-1.4c-1.4 0-1.8.9-1.8 1.8V12h3l-.5 2.9h-2.5v7A10 10 0 0022 12z" />
               </svg>
             </a>
-            <a className="group" href="#" aria-label="Instagram">
+            <a
+              className="group"
+              href="https://www.tiktok.com/@vivu.plan?lang=vi-VN"
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="TikTok"
+            >
               <svg
                 viewBox="0 0 24 24"
                 className="h-6 w-6 text-slate-700 group-hover:text-[#0891b2]"
                 fill="currentColor"
               >
-                <path d="M7 2h10a5 5 0 015 5v10a5 5 0 01-5 5H7a5 5 0 01-5-5V7a5 5 0 015-5zm10 2H7a3 3 0 00-3 3v10a3 3 0 003 3h10a3 3 0 003-3V7a3 3 0 00-3-3zm-5 3.5a5.5 5.5 0 110 11 5.5 5.5 0 010-11zm0 2a3.5 3.5 0 100 7 3.5 3.5 0 000-7zm5.8-.9a1.1 1.1 0 11-2.2 0 1.1 1.1 0 012.2 0z" />
-              </svg>
-            </a>
-            <a className="group" href="#" aria-label="Twitch">
-              <svg
-                viewBox="0 0 24 24"
-                className="h-6 w-6 text-slate-700 group-hover:text-[#0891b2]"
-                fill="currentColor"
-              >
-                <path d="M4 3h16v10l-4 4h-4l-3 3H7v-3H4V3zm14 2H6v10h3v3l3-3h4l2-2V5zm-3 2h2v5h-2V7zm-4 0h2v5h-2V7z" />
+                <path d="M19 7.7a6.9 6.9 0 0 0 3 1V12a10.5 10.5 0 0 1-3-0.5v4.7a7.2 7.2 0 1 1-6.2-7.1v3.3a4 4 0 1 0 3 3.8V2h3.2c.2 2.3 1.4 4.4 3 5.7z" />
               </svg>
             </a>
           </div>

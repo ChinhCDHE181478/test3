@@ -44,6 +44,12 @@ function LoginForm() {
   const timerRef = useRef<number | null>(null);
 
   useEffect(() => {
+    if (typeof window === "undefined") return;
+    const rememberedEmail = localStorage.getItem("last_login_email");
+    if (rememberedEmail) setEmail(rememberedEmail);
+  }, []);
+
+  useEffect(() => {
     return () => {
       if (timerRef.current) window.clearInterval(timerRef.current);
     };
@@ -95,8 +101,10 @@ function LoginForm() {
     try {
       const data = await authService.otpLoginVerify({ email, otp });
 
-
-      storeToken(data, true);
+      await storeToken(data, true);
+      if (typeof window !== "undefined") {
+        localStorage.setItem("last_login_email", email.trim());
+      }
 
       // ✅ Redirect về đúng nơi gọi login
       router.replace(nextPath);
