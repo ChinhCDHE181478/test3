@@ -54,8 +54,8 @@ logging:
 jwt:
   signerKey: "${SIGNER_KEY}"
   refreshSignerKey: "${REFRESH_SIGNER_KEY}"
-  validTime: 3600 #second
-  refreshTime: 86400 #second
+  validTime: 259200 #second
+  refreshTime: 259200 #second
 
 frontend:
   url: "${FRONTEND_URL}"

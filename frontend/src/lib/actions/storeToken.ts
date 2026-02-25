@@ -14,7 +14,7 @@ export async function storeToken(
   (await cookies()).set({
     name: "access_token",
     value: request.accessToken,
-    maxAge: 60 * 60 * 24 * 1,  // 1 day
+    maxAge: 259200,  // 1 day
     httpOnly: true,
     path: "/",
     sameSite: "lax",
@@ -24,7 +24,7 @@ export async function storeToken(
     (await cookies()).set({
       name: "refresh_token",
       value: request.refreshToken,
-      maxAge: 60 * 60 * 24 * 7,  // 1 week
+      maxAge: 259200,  // 1 week
       httpOnly: true,
       path: "/",
       sameSite: "lax",
