@@ -43,13 +43,44 @@ function qs(params: Record<string, any>) {
   return sp.toString();
 }
 
+function normalizeVietnamese(input: string) {
+  return input
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\u0111/g, "d")
+    .replace(/\u0110/g, "D");
+}
+
+function normalizeCityKey(input: string) {
+  return normalizeVietnamese(input)
+    .toLowerCase()
+    .replace(/[._-]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function canonicalHotelQuery(query: string) {
+  const trimmed = String(query || "").trim();
+  const key = normalizeCityKey(trimmed);
+  const isHoChiMinh =
+    key === "ho chi minh city" ||
+    key === "ho chi minh" ||
+    key === "thanh pho ho chi minh" ||
+    key === "tp hcm" ||
+    key === "tphcm" ||
+    key === "sai gon" ||
+    key === "saigon";
+
+  return isHoChiMinh ? "Ho Chi Minh City" : trimmed;
+}
+
 export const hotelService = {
   /**
    * BE: GET /hotel/search-destination?query=...
    */
   async searchDestination(query: string) {
     const res = await apiFetch<BaseJsonResponse<any>>(
-      `/hotel/search-destination?${qs({ query: query.trim() })}`,
+      `/hotel/search-destination?${qs({ query: canonicalHotelQuery(query) })}`,
       { method: "GET" },
       { auth: false }
     );
@@ -61,11 +92,60 @@ export const hotelService = {
    */
   async searchListDestination(query: string) {
     const res = await apiFetch<BaseJsonResponse<any>>(
-      `/hotel/search-list-destination?${qs({ query: query.trim() })}`,
+      `/hotel/search-list-destination?${qs({ query: canonicalHotelQuery(query) })}`,
       { method: "GET" },
       { auth: false }
     );
     return unwrap<any>(res, "Get List Destination Error");
+  },
+
+  /**
+   * Smart destination search for Vietnamese input:
+   * - call with original query first
+   * - if result is empty or too small, retry with non-diacritic query
+   * - merge unique items to avoid duplicates
+   */
+  async searchListDestinationSmart(query: string) {
+    const trimmed = query.trim();
+    if (!trimmed) return [];
+
+    const canonical = canonicalHotelQuery(trimmed);
+    const primary = await this.searchListDestination(canonical);
+    const primaryItems: any[] = Array.isArray(primary) ? primary : primary?.items || [];
+
+    const fallbackQuery = normalizeVietnamese(trimmed);
+    if (!fallbackQuery || fallbackQuery === canonical) {
+      return primaryItems;
+    }
+
+    if (primaryItems.length >= 3) {
+      return primaryItems;
+    }
+
+    const fallback = await this.searchListDestination(fallbackQuery);
+    const fallbackItems: any[] = Array.isArray(fallback) ? fallback : fallback?.items || [];
+
+    const seen = new Set<string>();
+    const merged: any[] = [];
+
+    const normalizeName = (item: any) =>
+      String(item?.name || item?.city || "")
+        .trim()
+        .toLowerCase();
+
+    const pushUnique = (item: any) => {
+      const display = normalizeName(item);
+      if (!display) return;
+      const key = String(item?.id || `${display}|${String(item?.type || "").toLowerCase()}`);
+      if (seen.has(key)) return;
+      seen.add(key);
+      merged.push(item);
+    };
+
+    primaryItems.forEach(pushUnique);
+    fallbackItems.forEach(pushUnique);
+
+    return merged;
   },
 
   /**
@@ -86,8 +166,13 @@ export const hotelService = {
     languagecode?: string;
     currencyCode?: string;
   }) {
+    const nextParams = {
+      ...params,
+      destination: canonicalHotelQuery(params.destination),
+    };
+
     const res = await apiFetch<BaseJsonResponse<any>>(
-      `/hotel/search?${qs(params)}`,
+      `/hotel/search?${qs(nextParams)}`,
       { method: "GET" },
       { auth: false }
     );

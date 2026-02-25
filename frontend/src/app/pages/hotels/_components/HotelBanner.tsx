@@ -72,7 +72,13 @@ function formatDateDisplay(isoDate: string): string {
   return `${d}/${m}/${y}`;
 }
 
-export default function HotelBanner() {
+export default function HotelBanner({
+  presetDestination = "",
+  onDestinationChange,
+}: {
+  presetDestination?: string;
+  onDestinationChange?: (value: string) => void;
+}) {
   const router = useRouter();
 
   // State Search
@@ -97,6 +103,12 @@ export default function HotelBanner() {
   const guestRef = useRef<HTMLDivElement>(null);
   const checkInRef = useRef<HTMLInputElement>(null);
   const checkOutRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!presetDestination) return;
+    setQ(presetDestination);
+    pickedRef.current = null;
+  }, [presetDestination]);
 
   // Click outside to close popups
   useEffect(() => {
@@ -127,8 +139,10 @@ export default function HotelBanner() {
     const timer = window.setTimeout(async () => {
       setLoadingSuggest(true);
       try {
-        const data = await hotelService.searchListDestination(t);
-        const items: Dest[] = Array.isArray(data) ? data : data?.items || [];
+        const data = await hotelService.searchListDestinationSmart(t);
+        const items: Dest[] = (Array.isArray(data) ? data : []).filter(
+          (x: Dest) => String(x?.name || x?.city || "").trim().length > 0
+        );
         setSuggest(items);
         setOpenSuggest(true);
       } catch {
@@ -144,6 +158,7 @@ export default function HotelBanner() {
   const onPickDest = (d: Dest) => {
     const displayText = d.name || d.label || "";
     setQ(displayText);
+    onDestinationChange?.(displayText);
     pickedRef.current = d;
     setOpenSuggest(false);
   };

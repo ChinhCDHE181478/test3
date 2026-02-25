@@ -4,21 +4,21 @@ import { useMemo } from "react";
 
 import FlightSearchCard, { FlightSearchValue } from "./FlightSearchCard";
 
-export default function BannerSection() {
+export default function BannerSection({ presetTo = "" }: { presetTo?: string }) {
   const router = useRouter();
 
   const defaultValue = useMemo<FlightSearchValue>(
     () => ({
       tripType: "ONEWAY",
       from: "",
-      to: "",
+      to: presetTo,
       fromId: "",
       toId: "",
       departDate: new Date().toISOString().slice(0, 10),
       adults: 1,
       currency_code: "VND",
     }),
-    []
+    [presetTo]
   );
 
   return (

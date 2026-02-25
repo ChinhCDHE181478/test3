@@ -100,8 +100,10 @@ const HotelSearchBox = ({
     const timer = window.setTimeout(async () => {
       setLoadingSuggest(true);
       try {
-        const data = await hotelService.searchListDestination(t);
-        const items: Dest[] = Array.isArray(data) ? data : data?.items || [];
+        const data = await hotelService.searchListDestinationSmart(t);
+        const items: Dest[] = (Array.isArray(data) ? data : []).filter(
+          (x: Dest) => String(x?.name || x?.city || "").trim().length > 0
+        );
         setSuggest(items);
         setOpenSuggest(true);
       } catch {

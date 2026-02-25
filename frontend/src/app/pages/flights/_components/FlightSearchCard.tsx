@@ -44,6 +44,7 @@ export type FlightSearchValue = {
 type DestinationOption = {
   id: string;
   label: string;
+  subtitle?: string;
 };
 
 const CABIN_LABEL: Record<string, string> = {
@@ -99,7 +100,20 @@ function normalizeDestination(item: any): DestinationOption | null {
     id;
 
   if (!id) return null;
-  return { id, label };
+  const subtitleRaw =
+    asString(item?.countryName) ||
+    asString(item?.country) ||
+    asString(item?.regionName) ||
+    asString(item?.subtitle) ||
+    asString(item?.address);
+
+  const subtitle = subtitleRaw || (() => {
+    const parts = label.split(",").map((p) => p.trim()).filter(Boolean);
+    if (parts.length > 1) return parts[parts.length - 1];
+    return "";
+  })();
+
+  return { id, label, subtitle };
 }
 
 function normalizeDestinationList(raw: any): DestinationOption[] {
@@ -155,7 +169,9 @@ const DropdownList = ({
               <div className="flex items-center gap-1.5">
                 <span className="text-[15px] font-semibold text-slate-900 whitespace-nowrap">{item.label}</span>
               </div>
-              <div className="text-[13px] text-slate-500 truncate mt-0.5">Việt Nam</div>
+              {item.subtitle ? (
+                <div className="text-[13px] text-slate-500 truncate mt-0.5">{item.subtitle}</div>
+              ) : null}
             </div>
           </button>
         ))}
@@ -226,6 +242,12 @@ export default function FlightSearchCard({
     setChildrenCount(parsed.length);
     setChildrenAges(parsed.map((n) => (Number.isFinite(n) ? n : null)));
     setCurrencyCode(value.currency_code ?? "VND");
+
+    // If destination is injected from outside (e.g. "Điểm đến phổ biến")
+    // and no concrete destination id is provided yet, auto-open suggestions.
+    if ((value.to ?? "").trim().length >= 2 && !(value.toId ?? "").trim()) {
+      setToOpen(true);
+    }
   }, [value]);
 
   useEffect(() => {
@@ -362,7 +384,7 @@ export default function FlightSearchCard({
           ))}
         </div>
 
-        <div className="flex flex-wrap gap-6 px-2">
+        {/* <div className="flex flex-wrap gap-6 px-2">
           {[
             { label: "Tìm sân bay gần đây", state: nearbyFrom, setter: setNearbyFrom },
             { label: "Chỉ bay thẳng", state: directOnly, setter: setDirectOnly },
@@ -386,7 +408,7 @@ export default function FlightSearchCard({
               <span className="opacity-90 group-hover:opacity-100 transition-opacity font-medium drop-shadow-md">{item.label}</span>
             </label>
           ))}
-        </div>
+        </div> */}
       </div>
 
       {/* Main Search Box Container */}
