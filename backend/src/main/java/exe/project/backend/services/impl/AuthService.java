@@ -12,10 +12,12 @@ import exe.project.backend.models.OtpVerification;
 import exe.project.backend.models.TokenBlacklist;
 import exe.project.backend.models.User;
 import exe.project.backend.models.UserProvider;
+import exe.project.backend.models.UserSubscription;
 import exe.project.backend.repositories.IUserProviderRepository;
 import exe.project.backend.repositories.IUserRepository;
 import exe.project.backend.repositories.OtpVerificationRepository;
 import exe.project.backend.repositories.TokenBlacklistRepository;
+import exe.project.backend.repositories.UserSubscriptionRepository;
 import exe.project.backend.services.IAuthService;
 import exe.project.backend.services.IEmailService;
 import exe.project.backend.services.IJwtService;
@@ -42,6 +44,7 @@ public class AuthService implements IAuthService {
     private final IUserProviderRepository userProviderRepository;
     private final OtpVerificationRepository otpVerificationRepository;
     private final TokenBlacklistRepository tokenBlacklistRepository;
+    private final UserSubscriptionRepository subscriptionRepository;
 
     @Override
     public RefreshTokenResponse refreshToken(RefreshTokenRequest request) {
@@ -67,8 +70,7 @@ public class AuthService implements IAuthService {
 
         return new RefreshTokenResponse(
                 newAccessToken,
-                request.getRefreshToken()
-        );
+                request.getRefreshToken());
     }
 
     @Override
@@ -88,37 +90,33 @@ public class AuthService implements IAuthService {
         }
     }
 
-
     @Override
     public void logout(LogoutRequest request) {
 
         blacklistToken(
                 request.getAccessToken(),
                 "ACCESS",
-                jwtService.getRemainingValidity(request.getAccessToken())
-        );
+                jwtService.getRemainingValidity(request.getAccessToken()));
 
         blacklistToken(
                 request.getRefreshToken(),
                 "REFRESH",
-                refreshTokenService.getRemainingValidity(request.getRefreshToken())
-        );
+                refreshTokenService.getRemainingValidity(request.getRefreshToken()));
     }
 
     private void blacklistToken(String token, String type, Long remainingMs) {
-        if (remainingMs <= 0) return;
+        if (remainingMs <= 0)
+            return;
 
         TokenBlacklist blacklist = TokenBlacklist.builder()
                 .token(token)
                 .tokenType(type)
                 .expiresAt(
-                        LocalDateTime.now().plusNanos(remainingMs * 1_000_000)
-                )
+                        LocalDateTime.now().plusNanos(remainingMs * 1_000_000))
                 .build();
 
         tokenBlacklistRepository.save(blacklist);
     }
-
 
     @Override
     public LoginResponse loginWithOauth2O(String code, String provider) {
@@ -175,8 +173,7 @@ public class AuthService implements IAuthService {
             emailService.sendEmail(
                     email,
                     "🔐 Mã xác thực đăng nhập Vivuplan", // Subject có icon tạo sự chú ý
-                    htmlContent
-            );
+                    htmlContent);
         } catch (Exception e) {
             // Log lỗi nếu cần thiết
             // log.error("Error sending OTP email", e);
@@ -188,55 +185,56 @@ public class AuthService implements IAuthService {
      */
     private String buildOtpEmailTemplate(String name, String otp) {
         return """
-            <!DOCTYPE html>
-            <html>
-            <head>
-                <meta charset="UTF-8">
-                <style>
-                    body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; background-color: #f4f6f8; margin: 0; padding: 0; }
-                    .container { max-width: 600px; margin: 40px auto; background-color: #ffffff; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.05); overflow: hidden; }
-                    .header { background-color: #0056D2; padding: 30px; text-align: center; }
-                    .header h1 { color: #ffffff; margin: 0; font-size: 24px; font-weight: 700; letter-spacing: 1px; }
-                    .content { padding: 40px 30px; color: #333333; line-height: 1.6; }
-                    .greeting { font-size: 18px; font-weight: 600; margin-bottom: 20px; color: #1a1a1a; }
-                    .message { margin-bottom: 25px; color: #555555; }
-                    .otp-box { background-color: #f0f7ff; border: 2px dashed #0056D2; border-radius: 8px; padding: 15px; text-align: center; margin: 30px 0; }
-                    .otp-code { font-size: 36px; font-weight: 800; color: #0056D2; letter-spacing: 8px; font-family: 'Courier New', monospace; }
-                    .expiry { font-size: 13px; color: #888888; margin-top: 10px; text-align: center; }
-                    .footer { background-color: #f9fafb; padding: 20px; text-align: center; font-size: 12px; color: #999999; border-top: 1px solid #eeeeee; }
-                    .footer a { color: #0056D2; text-decoration: none; }
-                </style>
-            </head>
-            <body>
-                <div class="container">
-                    <div class="header">
-                        <h1>VIVUPLAN</h1>
-                    </div>
-                    <div class="content">
-                        <div class="greeting">Xin chào %s,</div>
-                        <div class="message">
-                            Chúng tôi nhận được yêu cầu đăng nhập vào tài khoản Vivuplan của bạn. 
-                            Vui lòng sử dụng mã bên dưới để hoàn tất xác thực.
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <meta charset="UTF-8">
+                    <style>
+                        body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; background-color: #f4f6f8; margin: 0; padding: 0; }
+                        .container { max-width: 600px; margin: 40px auto; background-color: #ffffff; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.05); overflow: hidden; }
+                        .header { background-color: #0056D2; padding: 30px; text-align: center; }
+                        .header h1 { color: #ffffff; margin: 0; font-size: 24px; font-weight: 700; letter-spacing: 1px; }
+                        .content { padding: 40px 30px; color: #333333; line-height: 1.6; }
+                        .greeting { font-size: 18px; font-weight: 600; margin-bottom: 20px; color: #1a1a1a; }
+                        .message { margin-bottom: 25px; color: #555555; }
+                        .otp-box { background-color: #f0f7ff; border: 2px dashed #0056D2; border-radius: 8px; padding: 15px; text-align: center; margin: 30px 0; }
+                        .otp-code { font-size: 36px; font-weight: 800; color: #0056D2; letter-spacing: 8px; font-family: 'Courier New', monospace; }
+                        .expiry { font-size: 13px; color: #888888; margin-top: 10px; text-align: center; }
+                        .footer { background-color: #f9fafb; padding: 20px; text-align: center; font-size: 12px; color: #999999; border-top: 1px solid #eeeeee; }
+                        .footer a { color: #0056D2; text-decoration: none; }
+                    </style>
+                </head>
+                <body>
+                    <div class="container">
+                        <div class="header">
+                            <h1>VIVUPLAN</h1>
                         </div>
-                        
-                        <div class="otp-box">
-                            <div class="otp-code">%s</div>
+                        <div class="content">
+                            <div class="greeting">Xin chào %s,</div>
+                            <div class="message">
+                                Chúng tôi nhận được yêu cầu đăng nhập vào tài khoản Vivuplan của bạn.
+                                Vui lòng sử dụng mã bên dưới để hoàn tất xác thực.
+                            </div>
+
+                            <div class="otp-box">
+                                <div class="otp-code">%s</div>
+                            </div>
+
+                            <div class="expiry">Mã này sẽ hết hạn sau <strong>5 phút</strong>.</div>
+
+                            <div class="message" style="margin-top: 25px; font-size: 14px; color: #cc0000;">
+                                ⚠️ Lưu ý: Tuyệt đối không chia sẻ mã này cho bất kỳ ai, kể cả nhân viên Vivuplan.
+                            </div>
                         </div>
-                        
-                        <div class="expiry">Mã này sẽ hết hạn sau <strong>5 phút</strong>.</div>
-                        
-                        <div class="message" style="margin-top: 25px; font-size: 14px; color: #cc0000;">
-                            ⚠️ Lưu ý: Tuyệt đối không chia sẻ mã này cho bất kỳ ai, kể cả nhân viên Vivuplan.
+                        <div class="footer">
+                            <p>&copy; 2026 Vivuplan. All rights reserved.</p>
+                            <p>Nếu bạn không yêu cầu mã này, vui lòng bỏ qua email này hoặc <a href="#">liên hệ hỗ trợ</a>.</p>
                         </div>
                     </div>
-                    <div class="footer">
-                        <p>&copy; 2026 Vivuplan. All rights reserved.</p>
-                        <p>Nếu bạn không yêu cầu mã này, vui lòng bỏ qua email này hoặc <a href="#">liên hệ hỗ trợ</a>.</p>
-                    </div>
-                </div>
-            </body>
-            </html>
-            """.formatted(name, otp);
+                </body>
+                </html>
+                """
+                .formatted(name, otp);
     }
 
     @Override
@@ -262,7 +260,16 @@ public class AuthService implements IAuthService {
                             .email(request.getEmail())
                             .role(Role.USER) // role mặc định
                             .build();
-                    return userRepository.save(newUser);
+                    newUser = userRepository.save(newUser);
+                    LocalDateTime now = LocalDateTime.now();
+                    UserSubscription subscription = UserSubscription.builder()
+                            .userId(newUser.getId())
+                            .build();
+                    // Chưa có subscription hoặc đã hết hạn -> expiredAt = now + duration
+                    subscription.setExpiredAt(now.plusDays(3));
+
+                    subscriptionRepository.save(subscription);
+                    return newUser;
                 });
 
         otp.setUsed(true);
@@ -274,7 +281,6 @@ public class AuthService implements IAuthService {
         return response;
     }
 
-
     private User findOrRegisterUser(OnboardingUser onboardingUser) {
         return userRepository.findByEmail(onboardingUser.getEmail())
                 .orElseGet(() -> registerOauth2User(onboardingUser));
@@ -284,7 +290,18 @@ public class AuthService implements IAuthService {
         User user = User.builder()
                 .email(onboardingUser.getEmail())
                 .build();
-        return userRepository.save(user);
+        user = userRepository.save(user);
+
+        // Tặng 3 ngày subscription cho user mới
+        LocalDateTime now = LocalDateTime.now();
+        UserSubscription subscription = UserSubscription.builder()
+                .userId(user.getId())
+                .expiredAt(now.plusDays(3))
+                .build();
+
+        subscriptionRepository.save(subscription);
+
+        return user;
     }
 
     private void linkProvider(User user, String provider, String providerId) {
