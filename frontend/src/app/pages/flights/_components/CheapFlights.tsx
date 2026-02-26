@@ -96,7 +96,7 @@ function buildFallbackSearchUrl(from: string, to: string, displayDate: string) {
 const CHEAP_FLIGHT_ROUTES = [
   { fromQuery: "Hà Nội", toQuery: "Đà Nẵng", fromLabel: "Hà Nội", toLabel: "Đà Nẵng", img: HOTEL_CITY_IMAGES.danang, dayOffset: 7 },
   { fromQuery: "Ho Chi Minh City", toQuery: "Hà Nội", fromLabel: "TP.HCM", toLabel: "Hà Nội", img: HOTEL_CITY_IMAGES.hanoi, dayOffset: 10 },
-  { fromQuery: "Tan Son Nhat International Airport", toQuery: "Phu Quoc International Airport", fromLabel: "Tan Son Nhat International Airport", toLabel: "Phu Quoc International Airport", img: HOTEL_CITY_IMAGES.phuquoc, dayOffset: 14 },
+  { fromQuery: "Tan Son Nhat International Airport", toQuery: "Phu Quoc International Airport", fromLabel: "TP.HCM", toLabel: "Phú Quốc", img: HOTEL_CITY_IMAGES.phuquoc, dayOffset: 14 },
 ];
 const ROUTE_SIGNATURE = CHEAP_FLIGHT_ROUTES.map((r) => `${r.fromLabel}->${r.toLabel}`).join("|");
 

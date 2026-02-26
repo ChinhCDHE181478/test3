@@ -3,6 +3,8 @@ export const CITY_IMAGES: Record<string, string> = {
     "https://images.unsplash.com/photo-1544989164-31dc3c645987?q=80&w=1600&auto=format&fit=crop",
   "Đà Nẵng":
     "https://media.istockphoto.com/id/1156033272/photo/view-of-dragon-bridge.jpg?s=612x612&w=0&k=20&c=AWjPA35U5_LMjUx-FT6T36qOU8JC_aPANTSPaOmoQM8=",
+  "Vũng Tàu":
+    "https://images.pexels.com/photos/29562858/pexels-photo-29562858.png?_gl=1*k8q0v3*_ga*ODAwNTI4ODcyLjE3NzIwNDA3MTE.*_ga_8JE65Q40S6*czE3NzIwNDA3MTAkbzEkZzEkdDE3NzIwNDExNjckajU5JGwwJGgw",
   "Phú Quốc":
     "https://images.unsplash.com/photo-1693294603830-f44c9511d643?ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&q=80&w=1933",
   "Nha Trang":
@@ -22,11 +24,11 @@ export const topCityHotels = [
     img: CITY_IMAGES["Đà Nẵng"],
   },
   {
-    city: "Phú Quốc",
+    city: "Vũng Tàu",
     name: "Sunrise Island Hotel",
     rating: 4.6,
     reviews: 615,
-    img: CITY_IMAGES["Phú Quốc"],
+    img: CITY_IMAGES["Vũng Tàu"],
   },
   {
     city: "Nha Trang",
@@ -38,7 +40,7 @@ export const topCityHotels = [
 ];
 
 export const domesticTabs = [
-  "Phú Quốc",
+  "Vũng Tàu",
   "TP.HCM",
   "Hà Nội",
   "Đà Nẵng",
