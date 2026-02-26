@@ -5,6 +5,56 @@ function formatCurrency(amount: any, code: string) {
   return `${new Intl.NumberFormat("vi-VN").format(n)} đ`;
 }
 
+function formatDurationMinutes(totalMinutes: number) {
+  if (!Number.isFinite(totalMinutes) || totalMinutes <= 0) return "--";
+  const h = Math.floor(totalMinutes / 60);
+  const m = totalMinutes % 60;
+  if (h <= 0) return `${m}m`;
+  if (m <= 0) return `${h}h`;
+  return `${h}h${m}m`;
+}
+
+function parseDurationText(raw: any) {
+  const s = String(raw ?? "").trim();
+  if (!s) return "";
+
+  const iso = s.match(/^PT(?:(\d+)H)?(?:(\d+)M)?$/i);
+  if (iso) {
+    const h = Number(iso[1] || 0);
+    const m = Number(iso[2] || 0);
+    return formatDurationMinutes(h * 60 + m);
+  }
+
+  const compact = s
+    .toLowerCase()
+    .replace(/\s+/g, "")
+    .replace("giờ", "h")
+    .replace("gio", "h")
+    .replace("phút", "m")
+    .replace("phut", "m")
+    .replace("g", "h");
+
+  const hm = compact.match(/(\d+)h(?:(\d+)m?)?/);
+  if (hm) {
+    const h = Number(hm[1] || 0);
+    const m = Number(hm[2] || 0);
+    return formatDurationMinutes(h * 60 + m);
+  }
+
+  const onlyMin = compact.match(/^(\d+)m$/);
+  if (onlyMin) return formatDurationMinutes(Number(onlyMin[1]));
+
+  return s;
+}
+
+function diffMinutesBetweenIso(departureIso?: string, arrivalIso?: string) {
+  if (!departureIso || !arrivalIso) return NaN;
+  const dep = new Date(departureIso).getTime();
+  const arr = new Date(arrivalIso).getTime();
+  if (!Number.isFinite(dep) || !Number.isFinite(arr) || arr <= dep) return NaN;
+  return Math.round((arr - dep) / 60000);
+}
+
 export default function FlightOfferCard({ offer }: { offer: any }) {
   const seg = offer?.segments?.[0];
   const legs = seg?.legs ?? [];
@@ -12,6 +62,9 @@ export default function FlightOfferCard({ offer }: { offer: any }) {
 
   const currency = offer?.priceBreakdown?.totalRounded?.currencyCode || "VND";
   const priceUnits = offer?.priceBreakdown?.totalRounded?.units || 0;
+  const durationText =
+    parseDurationText(seg?.totalTime ?? seg?.duration ?? offer?.totalTime) ||
+    formatDurationMinutes(diffMinutesBetweenIso(seg?.departureTime, seg?.arrivalTime));
 
   return (
     <div className="group rounded-xl bg-white ring-1 ring-slate-200 hover:ring-blue-300 shadow-sm transition-all overflow-hidden mb-4">
@@ -58,7 +111,7 @@ export default function FlightOfferCard({ offer }: { offer: any }) {
                     </svg>
                  </div>
               </div>
-              <div className="text-[10px] text-slate-400 mt-1">1g 20</div>
+              <div className="text-[10px] text-slate-400 mt-1">{durationText}</div>
             </div>
 
             <div className="text-center min-w-[60px]">
