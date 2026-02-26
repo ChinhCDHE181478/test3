@@ -78,7 +78,7 @@ function FlightResultsContent() {
         if (cancelled) return;
         const data = res?.result || res;
         setOffers(Array.isArray(data?.flightOffers) ? data.flightOffers : []);
-      } catch (e: any) {
+      } catch {
         if (cancelled) return;
         setError("Hệ thống đang gặp sự cố kết nối dữ liệu.");
         setOffers([]);
@@ -87,7 +87,9 @@ function FlightResultsContent() {
       }
     }
     run();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [apiParams]);
 
   const goToPage = (nextPage: number) => {
@@ -141,7 +143,6 @@ function FlightResultsContent() {
 
       <div className="container mx-auto px-4 py-8">
         <div className="max-w-7xl mx-auto">
-
           {offers.length > 0 ? (
             <>
               <FlightResultsPane
@@ -155,7 +156,6 @@ function FlightResultsContent() {
 
               {!isLoading && (
                 <div className="mt-10 flex justify-center items-center gap-3">
-                  {/* NÚT QUAY LẠI - CHỈ HIỆN TỪ TRANG 2 */}
                   {page > 1 && (
                     <button
                       onClick={() => goToPage(page - 1)}
@@ -165,7 +165,6 @@ function FlightResultsContent() {
                     </button>
                   )}
 
-                  {/* NÚT XEM THÊM */}
                   <button
                     onClick={() => goToPage(page + 1)}
                     className="flex items-center gap-2 px-6 py-2.5 bg-white border border-slate-200 text-slate-700 rounded-full text-sm font-bold shadow-sm hover:bg-slate-50 hover:border-[#0891b2] hover:text-[#0891b2] transition-all active:scale-95"
@@ -215,11 +214,13 @@ function FlightResultsContent() {
 
 export default function FlightResultsPage() {
   return (
-    <Suspense fallback={
-      <div className="min-h-screen flex items-center justify-center bg-slate-50">
-        <div className="text-slate-600">Đang tải...</div>
-      </div>
-    }>
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center bg-slate-50">
+          <div className="text-slate-600">Đang tải...</div>
+        </div>
+      }
+    >
       <FlightResultsContent />
     </Suspense>
   );
