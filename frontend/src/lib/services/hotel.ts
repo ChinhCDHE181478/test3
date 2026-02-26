@@ -74,6 +74,85 @@ function canonicalHotelQuery(query: string) {
   return isHoChiMinh ? "Ho Chi Minh City" : trimmed;
 }
 
+function toNormKey(input: any) {
+  return normalizeCityKey(String(input || ""));
+}
+
+function typeWeight(type: string) {
+  const t = String(type || "").toLowerCase();
+  if (t === "city") return 6;
+  if (t === "region") return 5;
+  if (t === "district") return 4;
+  if (t === "landmark") return 3;
+  if (t === "airport") return 2;
+  if (t === "hotel") return 1;
+  return 0;
+}
+
+function humanType(type: string) {
+  const t = String(type || "").toLowerCase();
+  if (t === "city") return "Thành phố";
+  if (t === "airport") return "Sân bay";
+  if (t === "region") return "Khu vực";
+  if (t === "landmark") return "Điểm đến";
+  if (t === "hotel") return "Khách sạn";
+  return "Địa điểm";
+}
+
+function countryDisplay(codeOrName: string) {
+  const raw = String(codeOrName || "").trim();
+  if (!raw) return "";
+  const upper = raw.toUpperCase();
+
+  if (upper === "VN") return "Việt Nam";
+  if (upper === "TH") return "Thái Lan";
+  if (upper === "FR") return "Pháp";
+  if (upper === "US") return "Hoa Kỳ";
+  if (upper === "IT") return "Ý";
+
+  if (upper.length === 2) {
+    try {
+      // Browser + modern Node runtimes support this.
+      const display = new Intl.DisplayNames(["vi"], { type: "region" }).of(upper);
+      if (display && display !== upper) return display;
+    } catch {
+      // Ignore and fallback below.
+    }
+  }
+
+  return raw;
+}
+
+function normalizeDest(item: any) {
+  const name = String(item?.name || item?.city || item?.city_name || "").trim();
+  const type = String(item?.type || item?.dest_type || "").trim().toLowerCase();
+  const country = String(item?.country || item?.cc1 || "").trim().toUpperCase();
+  const id = String(item?.id || item?.destination_id || item?.dest_id || "").trim();
+  const latitude = Number(item?.latitude);
+  const longitude = Number(item?.longitude);
+
+  if (!name) return null;
+
+  const city = String(item?.city || item?.city_name || "").trim() || name;
+  const countryText = countryDisplay(country);
+  const labelParts: string[] = [];
+  if (city) labelParts.push(city);
+  if (countryText) labelParts.push(countryText);
+  const label = labelParts.join(", ") || humanType(type);
+
+  return {
+    ...item,
+    id,
+    destination_id: id || item?.destination_id,
+    name,
+    city,
+    type,
+    label,
+    latitude: Number.isFinite(latitude) ? latitude : undefined,
+    longitude: Number.isFinite(longitude) ? longitude : undefined,
+  };
+}
+
 export const hotelService = {
   /**
    * BE: GET /hotel/search-destination?query=...
@@ -114,38 +193,43 @@ export const hotelService = {
     const primaryItems: any[] = Array.isArray(primary) ? primary : primary?.items || [];
 
     const fallbackQuery = normalizeVietnamese(trimmed);
-    if (!fallbackQuery || fallbackQuery === canonical) {
-      return primaryItems;
+    let fallbackItems: any[] = [];
+    if (fallbackQuery && toNormKey(fallbackQuery) !== toNormKey(canonical)) {
+      const fallback = await this.searchListDestination(fallbackQuery);
+      fallbackItems = Array.isArray(fallback) ? fallback : fallback?.items || [];
     }
 
-    if (primaryItems.length >= 3) {
-      return primaryItems;
-    }
+    const queryKey = toNormKey(trimmed);
+    const mergedRaw = [...primaryItems, ...fallbackItems];
+    const bestByKey = new Map<string, any>();
 
-    const fallback = await this.searchListDestination(fallbackQuery);
-    const fallbackItems: any[] = Array.isArray(fallback) ? fallback : fallback?.items || [];
-
-    const seen = new Set<string>();
-    const merged: any[] = [];
-
-    const normalizeName = (item: any) =>
-      String(item?.name || item?.city || "")
-        .trim()
-        .toLowerCase();
-
-    const pushUnique = (item: any) => {
-      const display = normalizeName(item);
-      if (!display) return;
-      const key = String(item?.id || `${display}|${String(item?.type || "").toLowerCase()}`);
-      if (seen.has(key)) return;
-      seen.add(key);
-      merged.push(item);
+    const score = (item: any) => {
+      const nameKey = toNormKey(item?.name || item?.city || item?.city_name || "");
+      const type = String(item?.type || item?.dest_type || "").toLowerCase();
+      let s = typeWeight(type) * 100;
+      if (!queryKey) return s;
+      if (nameKey === queryKey) s += 60;
+      else if (nameKey.startsWith(queryKey)) s += 40;
+      else if (nameKey.includes(queryKey)) s += 20;
+      return s;
     };
 
-    primaryItems.forEach(pushUnique);
-    fallbackItems.forEach(pushUnique);
+    for (const raw of mergedRaw) {
+      const norm = normalizeDest(raw);
+      if (!norm) continue;
+      const key = `${toNormKey(norm.name)}|${String(norm.country || "").toLowerCase()}`;
+      const prev = bestByKey.get(key);
+      if (!prev || score(norm) > score(prev)) {
+        bestByKey.set(key, norm);
+      }
+    }
 
-    return merged;
+    return Array.from(bestByKey.values()).sort((a, b) => {
+      const sa = score(a);
+      const sb = score(b);
+      if (sb !== sa) return sb - sa;
+      return String(a.name || "").localeCompare(String(b.name || ""));
+    });
   },
 
   /**

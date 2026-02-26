@@ -297,7 +297,7 @@ function VivuplanPremiumContent() {
   // VÁ LỖI HIỂN THỊ "NỘI DUNG BỊ KHÓA"
   const shouldLockContent = useMemo(() => {
     if (isAccessCheckLoading) return false;
-    
+
     // Fix chớp màn hình: Check trực tiếp URL param thay vì chờ useEffect set state allowGuestDemo
     const isDemoGuest = allowGuestDemo || Boolean(searchParams?.get("prompt"));
 
@@ -311,21 +311,21 @@ function VivuplanPremiumContent() {
     const hasAnyMsg = messages.length > 0;
     const hasAnyHistory = chatHistory.length > 0;
     const isFirstTime = !hasAnyHistory && !hasAnyMsg && !hasAnyResult;
-    
+
     if (!isAuthenticated && !isDemoGuest) return true;
     if (isFirstTime) return false;
     return true;
   }, [
-    isAccessCheckLoading, 
-    isAuthenticated, 
-    allowGuestDemo, 
-    isSubStatusResolved, 
-    subStatusError, 
-    subStatus.active, 
-    itineraryData, 
-    hotelData, 
-    messages.length, 
-    chatHistory.length, 
+    isAccessCheckLoading,
+    isAuthenticated,
+    allowGuestDemo,
+    isSubStatusResolved,
+    subStatusError,
+    subStatus.active,
+    itineraryData,
+    hotelData,
+    messages.length,
+    chatHistory.length,
     searchParams
   ]);
 
@@ -828,8 +828,8 @@ function VivuplanPremiumContent() {
         </div>
         <h3 className="font-bold text-slate-900">Nội dung bị khóa</h3>
         <p className="text-xs text-slate-500 mt-1 mb-4">Vui lòng mở khóa Premium để xem chi tiết.</p>
-        <button 
-          onClick={() => setShowPaywall(true)} 
+        <button
+          onClick={() => setShowPaywall(true)}
           className="bg-blue-600 text-white px-6 py-2 rounded-xl text-xs font-bold uppercase tracking-wide hover:bg-blue-700 transition-all active:scale-95"
         >
           Mở khóa ngay
@@ -1175,23 +1175,39 @@ function VivuplanPremiumContent() {
 
                       {/* NOTES SECTION */}
                       {itineraryData.notes && (
-                        <div className="relative overflow-hidden bg-gradient-to-r from-blue-50 to-cyan-50 p-6 rounded-[2rem] border-l-4 border-[#0056D2] shadow-sm mt-8 group hover:shadow-md transition-all">
-                          <div className="absolute top-0 right-0 p-6 opacity-10 text-[#0056D2] group-hover:scale-110 transition-transform duration-700">
-                            <Info size={100} />
+                        <div className="relative overflow-hidden bg-gradient-to-br from-blue-50/80 to-cyan-50/50 border border-blue-100 p-6 rounded-2xl shadow-sm mt-8 group hover:shadow-md hover:border-blue-200 transition-all duration-300">
+
+                          {/* Background Icon (Tinh tế hơn) */}
+                          <div className="absolute -top-4 -right-4 text-[#0056D2] opacity-[0.03] group-hover:scale-110 group-hover:opacity-[0.05] transition-all duration-500 pointer-events-none">
+                            <Info size={140} strokeWidth={1.5} />
                           </div>
-                          <h3 className="text-xs font-black text-[#0056D2] uppercase tracking-[0.2em] mb-4 flex items-center gap-2 relative z-10">
-                            <Info size={16} strokeWidth={3} /> Lưu ý quan trọng
+
+                          {/* Header */}
+                          <h3 className="text-sm font-bold text-[#0056D2] uppercase tracking-wider mb-4 flex items-center gap-2 relative z-10">
+                            <div className="p-1 bg-blue-100/50 rounded-md">
+                              <Info size={16} strokeWidth={2.5} />
+                            </div>
+                            Lưu ý quan trọng
                           </h3>
-                          <div className="text-sm text-slate-700 leading-relaxed font-medium whitespace-pre-line relative z-10">
-                            {itineraryData.notes.split("•").map((note: string, index: number) =>
-                              note.trim() ? (
-                                <p key={index} className="mb-2 pl-4 relative">
-                                  <span className="absolute left-0 top-1.5 w-1.5 h-1.5 bg-[#0056D2] rounded-full"></span>
-                                  {note.trim()}
-                                </p>
-                              ) : null
-                            )}
-                          </div>
+
+                          {/* Content List */}
+                          <ul className="space-y-3 relative z-10">
+                            {itineraryData.notes.split("•").map((note: string, index: number) => {
+                              const trimmedNote = note.trim();
+                              if (!trimmedNote) return null;
+
+                              return (
+                                <li key={index} className="flex items-start gap-3 text-sm text-slate-700 leading-relaxed font-medium">
+                                  {/* Custom Bullet Point (Fix lỗi lệch align khi text nhiều dòng) */}
+                                  <span className="flex-shrink-0 w-1.5 h-1.5 rounded-full bg-[#0056D2] mt-2 ring-4 ring-blue-100/50"></span>
+                                  <span>{trimmedNote}</span>
+                                </li>
+                              );
+                            })}
+                          </ul>
+
+                          {/* Left Border Highlight */}
+                          <div className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-[#0056D2] to-cyan-400 rounded-l-2xl"></div>
                         </div>
                       )}
                     </div>
