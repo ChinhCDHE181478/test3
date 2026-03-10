@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React, { Suspense, useEffect, useMemo, useState, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -34,17 +34,90 @@ import {
   Info,
   ExternalLink,
 } from "lucide-react";
+import SegmentedToggle from "@/components/SegmentedToggle";
 import PlacesMapPane, { UiPlace } from "./PlacesMapPane";
 import { useAuth } from "../../AuthProvider";
+import {
+  LONG_TERM_SUBSCRIPTION_PLANS,
+  SHORT_TERM_SUBSCRIPTION_PLANS,
+  getSubscriptionDisplayName,
+  type PaidSubscriptionPlan,
+} from "@/lib/subscriptions";
 
 const API_BASE = process.env.NEXT_PUBLIC_AGENT_API!;
 const SPRING_BOOT_API = process.env.NEXT_PUBLIC_API_URL!;
 const PROMPT_TUTORIAL_STORAGE_KEY = "vivuplan_prompt_tutorial_done";
+const CHAT_HISTORY_ACTIVITY_KEY = "vivuplan_chat_history_activity";
 
-const SUB_PACKAGES = [
-  { id: 1, packageCode: "day", name: "Gói 1 ngày", days: 1, price: 10000 },
-  { id: 2, packageCode: "month", name: "Gói 30 ngày", days: 30, price: 49000 },
-] as const;
+const SHORT_TERM_SUB_PACKAGES_DATA = SHORT_TERM_SUBSCRIPTION_PLANS.map((plan, index) => ({
+  id: index + 1,
+  packageCode: plan.packageCode,
+  name: plan.name,
+  durationLabel: plan.durationLabel,
+  price: plan.price,
+  periodLabel: plan.periodLabel,
+  badge: plan.badge,
+  highlight: Boolean(plan.highlight),
+  description: plan.description,
+  ctaLabel: plan.ctaLabel,
+}));
+
+const LONG_TERM_SUB_PACKAGES_DATA = LONG_TERM_SUBSCRIPTION_PLANS.map((plan, index) => ({
+  id: index + 1,
+  packageCode: plan.packageCode,
+  name: plan.name,
+  durationLabel: plan.durationLabel,
+  price: plan.price,
+  periodLabel: plan.periodLabel,
+  badge: plan.badge,
+  highlight: Boolean(plan.highlight),
+  description: plan.description,
+  ctaLabel: plan.ctaLabel,
+}));
+
+function getStoredHistoryActivity() {
+  if (typeof window === "undefined") return {} as Record<string, number>;
+  try {
+    const raw = localStorage.getItem(CHAT_HISTORY_ACTIVITY_KEY);
+    const parsed = raw ? JSON.parse(raw) : {};
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function markConversationActivity(sessionId: string, timestamp = Date.now()) {
+  if (typeof window === "undefined" || !sessionId) return;
+  const next = { ...getStoredHistoryActivity(), [sessionId]: timestamp };
+  localStorage.setItem(CHAT_HISTORY_ACTIVITY_KEY, JSON.stringify(next));
+}
+
+function getConversationTimestamp(item: any, activityMap: Record<string, number>) {
+  const sid = String(item?.session_id ?? item?.sessionId ?? "");
+  const localActivity = sid ? Number(activityMap[sid] ?? 0) : 0;
+  const serverTime = [
+    item?.last_message_at,
+    item?.lastMessageAt,
+    item?.updated_at,
+    item?.updatedAt,
+    item?.create_at,
+    item?.created_at,
+    item?.createdAt,
+  ]
+    .map((value) => new Date(value ?? "").getTime())
+    .find((value) => Number.isFinite(value) && value > 0) ?? 0;
+
+  return Math.max(localActivity, serverTime);
+}
+
+function sortConversationHistory(items: any[]) {
+  const activityMap = getStoredHistoryActivity();
+  return [...items].sort((a, b) => {
+    const timeDiff = getConversationTimestamp(b, activityMap) - getConversationTimestamp(a, activityMap);
+    if (timeDiff !== 0) return timeDiff;
+    return String(b?.session_id ?? "").localeCompare(String(a?.session_id ?? ""));
+  });
+}
 
 type SubStatus = {
   active: boolean;
@@ -172,6 +245,7 @@ function VivuplanPremiumContent() {
     width: number;
     height: number;
   } | null>(null);
+  const promptTutorialAutoOpenedForKey = useRef<string | null>(null);
 
   const [isStreaming, setIsStreaming] = useState(false);
 
@@ -212,9 +286,15 @@ function VivuplanPremiumContent() {
   const [subStatus, setSubStatus] = useState<SubStatus>({ active: false, packageCode: null });
   const [showPaywall, setShowPaywall] = useState(false);
   const [isPurchasing, setIsPurchasing] = useState(false);
+  const [selectedShortPackage, setSelectedShortPackage] = useState<string>("month");
+  const [selectedLongPackage, setSelectedLongPackage] = useState<string>("year");
   const [isAccessCheckLoading, setIsAccessCheckLoading] = useState(true);
   const [isSubStatusResolved, setIsSubStatusResolved] = useState(false);
   const [subStatusError, setSubStatusError] = useState<string | null>(null);
+  const promptTutorialStorageKey = useMemo(
+    () => `${PROMPT_TUTORIAL_STORAGE_KEY}:${user?.id ? String(user.id) : "guest"}`,
+    [user?.id]
+  );
   const promptTutorialSteps: PromptTutorialStep[] = useMemo(
     () => [
       {
@@ -249,11 +329,18 @@ function VivuplanPremiumContent() {
     []
   );
 
+  const openPromptTutorial = (step = 0) => {
+    setPromptTutorialRect(null);
+    setPromptTutorialStep(step);
+    setIsPromptPopoverOpen(step > 0);
+    setIsPromptTutorialOpen(true);
+  };
+
   const closePromptTutorial = () => {
     setIsPromptTutorialOpen(false);
     setPromptTutorialRect(null);
     if (typeof window !== "undefined") {
-      localStorage.setItem(PROMPT_TUTORIAL_STORAGE_KEY, "1");
+      localStorage.setItem(promptTutorialStorageKey, "1");
     }
   };
 
@@ -293,6 +380,13 @@ function VivuplanPremiumContent() {
       0
     );
   }, [itineraryData]);
+
+  const activeShortPackage =
+    SHORT_TERM_SUBSCRIPTION_PLANS.find((plan) => plan.packageCode === selectedShortPackage) ??
+    SHORT_TERM_SUBSCRIPTION_PLANS[0];
+  const activeLongPackage =
+    LONG_TERM_SUBSCRIPTION_PLANS.find((plan) => plan.packageCode === selectedLongPackage) ??
+    LONG_TERM_SUBSCRIPTION_PLANS[0];
 
   // VÁ LỖI HIỂN THỊ "NỘI DUNG BỊ KHÓA"
   const shouldLockContent = useMemo(() => {
@@ -338,8 +432,7 @@ function VivuplanPremiumContent() {
       if (!res.ok) { setChatHistory([]); return; }
       const dataH = json ?? {};
       if (dataH?.data) {
-        const sorted = [...dataH.data].sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-        setChatHistory(sorted);
+        setChatHistory(sortConversationHistory(dataH.data));
       } else { setChatHistory([]); }
     } catch { setChatHistory([]); }
   };
@@ -536,6 +629,19 @@ function VivuplanPremiumContent() {
 
     const sid = activeId || newSessionId();
     if (!activeId) setActiveId(sid);
+    markConversationActivity(sid);
+    setChatHistory((prev) => {
+      const existing = prev.find((item) => String(item?.session_id ?? item?.sessionId ?? "") === sid);
+      if (existing) return sortConversationHistory(prev);
+      return sortConversationHistory([
+        {
+          session_id: sid,
+          title: text.slice(0, 80),
+          created_at: new Date().toISOString(),
+        },
+        ...prev,
+      ]);
+    });
 
     try {
       const uid = getUserId();
@@ -717,13 +823,15 @@ function VivuplanPremiumContent() {
   useEffect(() => {
     if (!mounted || isAuthLoading || isAccessCheckLoading) return;
     if (typeof window === "undefined") return;
-    const hasSeenTutorial = localStorage.getItem(PROMPT_TUTORIAL_STORAGE_KEY) === "1";
-    if (!hasSeenTutorial) {
-      setIsPromptPopoverOpen(false);
-      setPromptTutorialStep(0);
-      setIsPromptTutorialOpen(true);
-    }
-  }, [mounted, isAuthLoading, isAccessCheckLoading]);
+    if (promptTutorialAutoOpenedForKey.current === promptTutorialStorageKey) return;
+    promptTutorialAutoOpenedForKey.current = promptTutorialStorageKey;
+
+    const hasSeenTutorial = localStorage.getItem(promptTutorialStorageKey) === "1";
+    if (hasSeenTutorial) return;
+
+    const raf = window.requestAnimationFrame(() => openPromptTutorial(0));
+    return () => window.cancelAnimationFrame(raf);
+  }, [mounted, isAuthLoading, isAccessCheckLoading, promptTutorialStorageKey]);
 
   useEffect(() => {
     if (!isPromptTutorialOpen) return;
@@ -786,32 +894,145 @@ function VivuplanPremiumContent() {
     </div>
   );
 
-  function PaywallModal({ isOpen, onClose, isAuthenticated: isAuth, subStatus, isPurchasing, onPurchase, onCheckStatus }: any) {
-    if (!isOpen) return null;
+  const renderPaywallModal = () => {
+    if (!showPaywall || isAccessCheckLoading || subStatusError || subStatus.active) return null;
     return (
-      <div className="fixed inset-0 z-[21000] flex items-center justify-center p-4">
-        <div className="absolute inset-0 bg-slate-900/70 backdrop-blur-md transition-opacity" onClick={onClose} />
-        <div className="relative w-full max-w-3xl bg-white rounded-[2rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col md:flex-row h-auto md:h-[500px]">
-          <div className="w-full md:w-2/5 bg-slate-50 p-8 flex flex-col border-b md:border-b-0 md:border-r border-slate-100">
-            <div className="mb-6"><div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-600 to-cyan-500 text-white flex items-center justify-center shadow-lg mb-4"><Lock size={24} /></div><h3 className="text-xl font-black text-slate-900 leading-tight">Mở khóa toàn bộ VivuPlan</h3><p className="text-xs text-slate-500 mt-2 font-medium">{subStatus.active ? `Đang kích hoạt: ${subStatus.packageCode || "Premium"}` : "Bạn đang dùng bản miễn phí giới hạn."}</p></div>
-            <div className="space-y-3 mt-auto">{["Lịch trình AI chi tiết", "Bản đồ thông minh", "Gợi ý khách sạn & vé máy bay", "Không giới hạn câu hỏi"].map((item, i) => (<div key={i} className="flex items-center gap-2 text-sm text-slate-600"><CheckCircle2 size={16} className="text-green-500 shrink-0" /><span>{item}</span></div>))}</div>
+      <div className="fixed inset-0 z-[21000] flex items-stretch justify-center px-0 pb-0 pt-[68px] md:items-center md:p-4">
+        <div className="absolute inset-0 bg-slate-900/70 backdrop-blur-md transition-opacity" onClick={() => setShowPaywall(false)} />
+        <div className="relative flex h-[calc(100dvh-68px)] w-full flex-col overflow-y-auto bg-slate-100 shadow-2xl animate-in zoom-in-95 duration-200 md:h-auto md:max-h-[92dvh] md:max-w-[1360px] md:overflow-hidden md:rounded-[2rem] md:bg-white md:flex-row">
+          <div className="px-4 pb-3 pt-5 md:hidden">
+            <div className="rounded-[1.75rem] border border-white/80 bg-white/88 px-4 py-4 shadow-[0_18px_45px_rgba(15,23,42,0.08)] backdrop-blur">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#0056D2]">Premium</p>
+                  <p className="mt-1 text-[15px] font-black tracking-tight text-slate-900">Mở khóa VivuPlan AI</p>
+                  <p className="mt-1 text-[12px] leading-relaxed text-slate-500">
+                    Chọn gói phù hợp để dùng AI lập lịch trình trọn vẹn hơn.
+                  </p>
+                </div>
+                <button
+                  onClick={() => setShowPaywall(false)}
+                  aria-label="Đóng paywall"
+                  className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-400 shadow-sm transition-all hover:bg-slate-50 hover:text-slate-600"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+            </div>
           </div>
-          <div className="flex-1 p-8 flex flex-col relative">
-            <button onClick={onClose} className="absolute top-4 right-4 p-2 text-slate-300 hover:text-slate-500 transition-colors"><X size={20} /></button>
-            <h4 className="text-sm font-bold uppercase tracking-widest text-slate-400 mb-6">Chọn gói dịch vụ</h4>
-            <div className="grid grid-cols-1 gap-4 flex-1">
-              {SUB_PACKAGES.map((p) => (
-                <div key={p.id} className={`relative rounded-2xl p-4 border-2 flex items-center justify-between transition-all ${p.packageCode === 'month' ? 'border-blue-500 bg-blue-50/10' : 'border-slate-100 hover:border-blue-200'}`}>
-                  {p.packageCode === 'month' && <div className="absolute -top-3 right-4 bg-blue-600 text-white text-[10px] font-bold px-3 py-1 rounded-full uppercase shadow-md">Tiết kiệm nhất</div>}
-                  <div className="flex-1"><p className="font-bold text-slate-800 text-sm">{p.name}</p><div className="flex items-baseline gap-1 mt-1"><p className="text-xl font-black text-slate-900">{p.price.toLocaleString()}đ</p><p className="text-[10px] text-slate-400 font-bold">/{p.days} ngày</p></div></div>
-                  <button disabled={!isAuth || isPurchasing} onClick={() => onPurchase(p.packageCode)} className={`px-4 py-2 rounded-xl text-[11px] font-black uppercase tracking-wider transition-all transform active:scale-95 shadow-sm ${(!isAuth || isPurchasing) ? "bg-slate-200 text-slate-400 cursor-not-allowed" : "bg-[#0056D2] text-white hover:bg-blue-700 hover:shadow-blue-200"}`}>Mua ngay</button>
+
+          <div className="mx-4 mb-4 rounded-[1.75rem] border border-white/80 bg-[linear-gradient(180deg,#f8fbff_0%,#ffffff_100%)] p-4 shadow-[0_18px_45px_rgba(15,23,42,0.08)] md:m-0 md:w-[340px] md:shrink-0 md:rounded-none md:border-b-0 md:border-r md:border-white/0 md:bg-[linear-gradient(180deg,#f8fbff_0%,#f8fafc_100%)] md:p-7 xl:w-[380px] xl:p-9">
+            <div className="hidden md:block md:mb-10">
+              <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-3xl bg-gradient-to-br from-blue-600 to-cyan-500 text-white shadow-lg shadow-cyan-200 md:mb-5 md:h-14 md:w-14">
+                <Lock size={22} className="md:hidden" />
+                <Lock size={26} className="hidden md:block" />
+              </div>
+              <h3 className="text-[15px] font-black leading-[1.2] tracking-tight text-slate-900 md:text-[22px]">Mở khóa toàn bộ VivuPlan</h3>
+              <p className="mt-1.5 text-[12px] font-medium leading-relaxed text-slate-500 md:mt-3 md:text-[13px]">
+                {subStatus.active ? `Đang kích hoạt: ${getSubscriptionDisplayName(subStatus.packageCode, "Premium")}` : "Bạn đang dùng bản miễn phí giới hạn."}
+              </p>
+            </div>
+
+            <div className="grid gap-2 md:gap-3">
+              {[
+                "Lịch trình AI chi tiết",
+                "Bản đồ thông minh",
+                "Gợi ý khách sạn và vé máy bay",
+                "Không giới hạn câu hỏi",
+              ].map((item, i) => (
+                <div key={i} className="flex items-center gap-3 rounded-2xl border border-slate-100 bg-white px-3.5 py-3 text-[11px] text-slate-700 shadow-sm md:px-4 md:text-[13px]">
+                  <CheckCircle2 size={15} className="shrink-0 text-green-500 md:h-[18px] md:w-[18px]" />
+                  <span>{item}</span>
                 </div>
               ))}
             </div>
-            <div className="mt-6 pt-6 border-t border-slate-100">
-              {!isAuth && <div className="flex items-center justify-between gap-2 mb-3 bg-amber-50 p-2 rounded-lg text-amber-700 text-xs font-bold border border-amber-100"><span>⚠️ Cần đăng nhập để mua</span><button onClick={() => router.push("/pages/login")} className="underline uppercase text-[10px] hover:text-amber-900 transition-colors">Đăng nhập</button></div>}
-              {isPurchasing ? <button disabled className="w-full py-3 rounded-xl bg-slate-100 text-slate-400 font-bold flex items-center justify-center gap-2 cursor-not-allowed"><Loader2 size={16} className="animate-spin" /> Đang xử lý...</button> : <button onClick={onCheckStatus} disabled={!isAuth} className="w-full py-3 rounded-xl border border-slate-200 text-slate-600 text-xs font-bold uppercase tracking-wide hover:bg-slate-50 disabled:opacity-50 flex items-center justify-center gap-2"><CreditCard size={14} /> Kiểm tra thanh toán</button>}
-              <p className="text-[10px] text-center text-slate-400 mt-3 font-medium">* Thanh toán an toàn qua cổng PayOS / VNPay.</p>
+
+            <div className="mt-4 rounded-2xl bg-slate-950 px-4 py-4 text-white shadow-lg md:mt-8 md:px-5">
+              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-cyan-300">Gợi ý</p>
+              <p className="mt-2 text-[11px] leading-relaxed text-slate-200 md:text-[13px]">
+                Chọn gói ngắn hạn nếu bạn chỉ cần AI cho một chuyến đi. Chọn gói dài hạn nếu bạn dùng thường xuyên.
+              </p>
+            </div>
+          </div>
+          <div className="relative flex min-w-0 flex-1 flex-col px-4 pb-6 pt-1 md:p-8 xl:p-9">
+            <div className="mb-4 flex items-center justify-between border-b border-slate-200 pb-4 md:sticky md:top-0 md:z-10 md:-mx-4 md:mb-5 md:border-slate-100 md:bg-white/95 md:px-4 md:pt-1 md:backdrop-blur">
+              <h4 className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400 md:text-[13px] md:tracking-[0.22em]">Chọn gói dịch vụ</h4>
+              <button onClick={() => setShowPaywall(false)} className="hidden rounded-full p-2 text-slate-300 transition-colors hover:bg-slate-100 hover:text-slate-500 md:inline-flex"><X size={20} /></button>
+            </div>
+            <div className="grid flex-1 grid-cols-1 gap-4 overflow-visible md:gap-5 md:overflow-y-auto md:pr-1 xl:grid-cols-[minmax(220px,0.88fr)_minmax(280px,1.02fr)_minmax(320px,1.14fr)]">
+              <div className="flex min-h-[234px] flex-col rounded-[1.5rem] border border-slate-200 bg-white p-4 shadow-[0_14px_35px_rgba(15,23,42,0.05)] md:min-h-[400px] md:rounded-[1.75rem] md:bg-slate-50 md:p-5 md:shadow-none">
+                <p className="text-[10px] font-black uppercase tracking-[0.25em] text-slate-400">Gói miễn phí</p>
+                <h5 className="mt-2 text-[16px] font-black tracking-tight text-slate-900 md:mt-3 md:text-[20px]">Thành viên</h5>
+                <p className="mt-2 text-[11px] leading-relaxed text-slate-500 md:mt-3 md:text-[13px]">Dùng khi bạn chỉ cần tìm vé, khách sạn và thanh toán cơ bản.</p>
+                <div className="mt-5 border-t border-slate-200 pt-5 md:mt-6 md:pt-6">
+                  <p className="text-[32px] font-black tracking-tighter text-slate-900 md:text-[52px]">Miễn phí</p>
+                </div>
+                <div className="mt-auto pt-5 text-[11px] font-semibold text-slate-500 md:pt-6 md:text-[12px]">Không bao gồm AI planner.</div>
+              </div>
+
+              <div className="flex min-h-[280px] flex-col rounded-[1.5rem] border border-cyan-200 bg-cyan-50/50 p-4 shadow-[0_16px_40px_rgba(34,211,238,0.12)] md:min-h-[400px] md:rounded-[1.75rem] md:p-5">
+                <p className="text-[10px] font-black uppercase tracking-[0.25em] text-cyan-600">Gói trải nghiệm</p>
+                <h5 className="mt-2 text-[16px] font-black tracking-tight text-slate-900 md:mt-3 md:text-[20px]">Ngắn hạn</h5>
+                <SegmentedToggle
+                  options={SHORT_TERM_SUB_PACKAGES_DATA.map((plan) => ({
+                    value: plan.packageCode,
+                    label: plan.durationLabel ?? plan.name,
+                  }))}
+                  value={selectedShortPackage}
+                  onChange={setSelectedShortPackage}
+                  groupId="paywall-short"
+                  tone="brand"
+                  layout="fill"
+                  size="sm"
+                  className="mt-4 w-full md:mt-5"
+                />
+                <div className="mt-5 md:mt-6">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="text-[16px] font-black tracking-tight text-slate-900 md:text-[18px]">{activeShortPackage.name}</p>
+                    {activeShortPackage.badge && (
+                      <span className="rounded-full bg-cyan-100 px-2.5 py-1 text-[10px] font-black uppercase tracking-wide text-cyan-700">
+                        {activeShortPackage.badge}
+                      </span>
+                    )}
+                  </div>
+                  <p className="mt-2 text-[11px] leading-relaxed text-slate-500 md:mt-3 md:text-[13px]">{activeShortPackage.description}</p>
+                </div>
+                <div className="mt-5 border-t border-cyan-100 pt-5 md:mt-6 md:pt-6">
+                  <div className="flex items-end gap-2"><p className="text-[32px] font-black tracking-tighter text-[#0056D2] md:text-[46px]">{activeShortPackage.price.toLocaleString("vi-VN")}đ</p><p className="mb-1 text-[10px] font-bold text-slate-400 md:text-[12px]">{activeShortPackage.periodLabel}</p></div>
+                </div>
+                <button disabled={!isAuthenticated || isPurchasing} onClick={() => purchaseSubscription(activeShortPackage.packageCode)} className={`mt-auto whitespace-nowrap rounded-2xl px-4 py-2.5 text-[10px] font-black uppercase tracking-[0.08em] transition-all transform active:scale-95 shadow-md md:px-5 md:py-3 md:text-[11px] md:tracking-[0.12em] ${(!isAuthenticated || isPurchasing) ? "bg-slate-200 text-slate-400 cursor-not-allowed" : "cursor-pointer bg-[#0056D2] text-white hover:bg-blue-700 hover:shadow-xl hover:shadow-blue-200"}`}>{activeShortPackage.ctaLabel}</button>
+              </div>
+
+              <div className="flex min-h-[280px] flex-col rounded-[1.5rem] border border-blue-200 bg-gradient-to-br from-sky-50 via-white to-cyan-50 p-4 text-slate-900 shadow-[0_20px_50px_rgba(59,130,246,0.14)] md:min-h-[400px] md:rounded-[1.75rem] md:p-5">
+                <p className="text-[10px] font-black uppercase tracking-[0.25em] text-blue-600">Gói cam kết</p>
+                <h5 className="mt-2 text-[16px] font-black tracking-tight text-slate-900 md:mt-3 md:text-[20px]">Dài hạn</h5>
+                <SegmentedToggle
+                  options={LONG_TERM_SUB_PACKAGES_DATA.map((plan) => ({
+                    value: plan.packageCode,
+                    label: plan.durationLabel ?? plan.name,
+                  }))}
+                  value={selectedLongPackage}
+                  onChange={setSelectedLongPackage}
+                  groupId="paywall-long"
+                  tone="brand"
+                  layout="fill"
+                  size="sm"
+                  className="mt-4 w-full md:mt-5"
+                />
+                <div className="mt-5 md:mt-6">
+                  <div className="flex flex-wrap items-center gap-2"><p className="text-[16px] font-black tracking-tight text-slate-900 md:text-[18px]">{activeLongPackage.name}</p>{activeLongPackage.badge && <span className="rounded-full bg-blue-100 px-2.5 py-1 text-[10px] font-black uppercase tracking-wide text-blue-700">{activeLongPackage.badge}</span>}</div>
+                  <p className="mt-2 text-[11px] leading-relaxed text-slate-600 md:mt-3 md:text-[13px]">{activeLongPackage.description}</p>
+                </div>
+                <div className="mt-5 border-t border-blue-100 pt-5 md:mt-6 md:pt-6">
+                  <div className="flex items-end gap-2"><p className="text-[32px] font-black tracking-tighter text-slate-900 md:text-[46px]">{activeLongPackage.price.toLocaleString("vi-VN")}đ</p><p className="mb-1 text-[10px] font-bold text-slate-500 md:text-[12px]">{activeLongPackage.periodLabel}</p></div>
+                </div>
+                <button disabled={!isAuthenticated || isPurchasing} onClick={() => purchaseSubscription(activeLongPackage.packageCode)} className={`mt-auto whitespace-nowrap rounded-2xl px-4 py-2.5 text-[10px] font-black uppercase tracking-[0.08em] transition-all transform active:scale-95 shadow-md md:px-5 md:py-3 md:text-[11px] md:tracking-[0.12em] ${(!isAuthenticated || isPurchasing) ? "bg-slate-200 text-slate-400 cursor-not-allowed" : "cursor-pointer bg-[#0056D2] text-white hover:bg-blue-700 hover:shadow-xl hover:shadow-blue-200"}`}>{activeLongPackage.ctaLabel}</button>
+              </div>
+            </div>
+            <div className="mt-4 border-t border-slate-100 pt-4 md:mt-7 md:pt-7">
+              {!isAuthenticated && <div className="flex items-center justify-between gap-2 mb-3 bg-amber-50 p-2 rounded-lg text-amber-700 text-xs font-bold border border-amber-100"><span>⚠️ Cần đăng nhập để mua</span><button onClick={() => router.push("/pages/login")} className="underline uppercase text-[10px] hover:text-amber-900 transition-colors">Đăng nhập</button></div>}
+              {isPurchasing ? <button disabled className="w-full py-3 rounded-xl bg-slate-100 text-slate-400 font-bold flex items-center justify-center gap-2 cursor-not-allowed"><Loader2 size={16} className="animate-spin" /> Đang xử lý...</button> : <button onClick={handleCheckPaymentStatus} disabled={!isAuthenticated} className="w-full py-3 rounded-xl border border-slate-200 text-slate-600 text-xs font-bold uppercase tracking-wide hover:bg-slate-50 disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer disabled:cursor-not-allowed md:text-[13px]"><CreditCard size={14} /> Kiểm tra thanh toán</button>}
+              <p className="mt-3 text-center text-[10px] font-medium text-slate-400 md:text-[11px]">* Thanh toán an toàn qua cổng PayOS / VNPay.</p>
             </div>
           </div>
         </div>
@@ -943,19 +1164,19 @@ function VivuplanPremiumContent() {
 
   if (!mounted || isAuthLoading || isAccessCheckLoading) {
     return (
-      <div className="fixed inset-0 top-[68px] w-screen h-[calc(100dvh-68px)] bg-white flex items-center justify-center">
-        <div className="flex items-center gap-3 text-slate-500 text-sm font-semibold">
+      <div suppressHydrationWarning className="fixed inset-0 top-[68px] w-screen h-[calc(100dvh-68px)] bg-white flex items-center justify-center">
+        <div suppressHydrationWarning className="flex items-center gap-3 text-slate-500 text-sm font-semibold">
           <Loader2 size={18} className="animate-spin text-[#0056D2]" />
           <span>Đang kiểm tra quyền truy cập...</span>
         </div>
       </div>
     );
-  }
+  };
 
   return (
-    <div className="fixed inset-0 top-[68px] w-screen h-[calc(100dvh-68px)] bg-white text-slate-900 font-sans flex overflow-hidden text-sm shadow-inner [&_button]:cursor-pointer [&_button:disabled]:cursor-not-allowed">
+    <div suppressHydrationWarning className="fixed inset-0 top-[68px] w-screen h-[calc(100dvh-68px)] bg-white text-slate-900 font-sans flex overflow-hidden text-sm shadow-inner [&_button]:cursor-pointer [&_button:disabled]:cursor-not-allowed">
       {showLoginGate && <LoginGateModal />}
-      {showPaywall && !isAccessCheckLoading && !subStatusError && !subStatus.active && <PaywallModal isOpen={showPaywall} onClose={() => setShowPaywall(false)} isAuthenticated={isAuthenticated} subStatus={subStatus} isPurchasing={isPurchasing} onPurchase={purchaseSubscription} onCheckStatus={handleCheckPaymentStatus} />}
+      {renderPaywallModal()}
       <PromptTutorialLayer />
 
       {/* SIDEBAR */}
@@ -994,10 +1215,13 @@ function VivuplanPremiumContent() {
               )}
               <div className="p-3 md:p-6 relative">
                 {isPromptPopoverOpen && (
-                  <div className="absolute bottom-full left-0 w-full px-3 md:px-6 pb-2 animate-in slide-in-from-bottom-4 z-50">
-                    <div className="max-w-3xl mx-auto bg-white rounded-3xl shadow-2xl border border-blue-100 p-5 md:p-6 relative">
-                      <button onClick={() => setIsPromptPopoverOpen(false)} className="absolute top-3 right-3 text-slate-300 hover:text-red-500"><X size={16} /></button>
-                      <h3 className="text-sm font-black italic uppercase text-[#0056D2] mb-4 flex items-center gap-2"><Sparkle size={14} /> Tạo nhanh</h3>
+                  <div className="fixed inset-x-3 top-[132px] bottom-[92px] z-[120] animate-in slide-in-from-bottom-4 md:absolute md:bottom-full md:left-0 md:right-auto md:top-auto md:inset-x-auto md:w-full md:px-6 md:pb-2">
+                    <div className="mx-auto flex h-full max-w-3xl flex-col overflow-hidden rounded-3xl border border-blue-100 bg-white shadow-2xl md:h-auto">
+                      <div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-100 bg-white/95 px-5 py-4 backdrop-blur">
+                        <h3 className="flex items-center gap-2 text-sm font-black italic uppercase text-[#0056D2]"><Sparkle size={14} /> Tạo nhanh</h3>
+                        <button onClick={() => setIsPromptPopoverOpen(false)} className="rounded-full p-2 text-slate-300 transition-colors hover:bg-slate-100 hover:text-red-500"><X size={16} /></button>
+                      </div>
+                      <div className="flex-1 overflow-y-auto px-5 pb-5 pt-4 md:p-6">
 
                       {/* Tabs */}
                       <div ref={promptTabsRef} className="flex bg-slate-100 p-1 rounded-xl mb-4">
@@ -1091,6 +1315,7 @@ function VivuplanPremiumContent() {
                       <button onClick={handlePromptSubmit} className="w-full mt-4 bg-[#0056D2] text-white py-3 rounded-xl text-[10px] font-black uppercase hover:bg-blue-700 transition-all">
                         {quickMode === "itinerary" ? "Tạo lịch trình" : "Tìm khách sạn"}
                       </button>
+                      </div>
                     </div>
                   </div>
                 )}
@@ -1099,9 +1324,7 @@ function VivuplanPremiumContent() {
                 <div className="max-w-3xl mx-auto mt-2 flex justify-end">
                   <button
                     onClick={() => {
-                      setIsPromptPopoverOpen(false);
-                      setPromptTutorialStep(0);
-                      setIsPromptTutorialOpen(true);
+                      openPromptTutorial(0);
                     }}
                     className="text-[10px] font-black uppercase tracking-wider text-[#0056D2] hover:underline"
                   >
@@ -1363,5 +1586,6 @@ export default function VivuplanPremiumApp() {
     </Suspense>
   );
 }
+
 
 
