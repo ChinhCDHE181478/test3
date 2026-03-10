@@ -397,18 +397,12 @@ function VivuplanPremiumContent() {
 
     if (isAuthenticated && !isDemoGuest) {
       if (!isSubStatusResolved) return false;
-      if (subStatusError) return false;
-      if (subStatus.active) return false;
+      if (subStatusError) return true;
+      return !subStatus.active;
     }
 
-    const hasAnyResult = Boolean(itineraryData || hotelData);
-    const hasAnyMsg = messages.length > 0;
-    const hasAnyHistory = chatHistory.length > 0;
-    const isFirstTime = !hasAnyHistory && !hasAnyMsg && !hasAnyResult;
-
     if (!isAuthenticated && !isDemoGuest) return true;
-    if (isFirstTime) return false;
-    return true;
+    return false;
   }, [
     isAccessCheckLoading,
     isAuthenticated,
@@ -416,10 +410,6 @@ function VivuplanPremiumContent() {
     isSubStatusResolved,
     subStatusError,
     subStatus.active,
-    itineraryData,
-    hotelData,
-    messages.length,
-    chatHistory.length,
     searchParams
   ]);
 
@@ -620,6 +610,13 @@ function VivuplanPremiumContent() {
     if (!text || isLoading) return;
     if (isAuthLoading || isAccessCheckLoading) return;
     if (!isAuthenticated && !allowGuestDemo) { setShowLoginGate(true); return; }
+    if (isAuthenticated && !allowGuestDemo) {
+      const latestStatus = await fetchSubscriptionStatus();
+      if (latestStatus.error || !latestStatus.active) {
+        setShowPaywall(true);
+        return;
+      }
+    }
     if (shouldLockContent) { setShowPaywall(true); return; }
 
     setMessages((prev) => [...prev, { role: "user", content: text }]);
@@ -815,10 +812,10 @@ function VivuplanPremiumContent() {
   }, [mounted, isAuthLoading, isAccessCheckLoading, searchParams]);
 
   useEffect(() => {
-    if (subStatus.active || subStatusError) {
+    if (subStatus.active) {
       setShowPaywall(false);
     }
-  }, [subStatus.active, subStatusError]);
+  }, [subStatus.active]);
 
   useEffect(() => {
     if (!mounted || isAuthLoading || isAccessCheckLoading) return;
@@ -895,7 +892,7 @@ function VivuplanPremiumContent() {
   );
 
   const renderPaywallModal = () => {
-    if (!showPaywall || isAccessCheckLoading || subStatusError || subStatus.active) return null;
+    if (!showPaywall || isAccessCheckLoading || subStatus.active) return null;
     return (
       <div className="fixed inset-0 z-[21000] flex items-stretch justify-center px-0 pb-0 pt-[68px] md:items-center md:p-4">
         <div className="absolute inset-0 bg-slate-900/70 backdrop-blur-md transition-opacity" onClick={() => setShowPaywall(false)} />
