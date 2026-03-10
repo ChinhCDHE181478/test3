@@ -31,28 +31,29 @@ export default function SegmentedToggle({
   const tones =
     tone === "brand"
       ? {
-          wrapper: "border border-cyan-100 bg-white/80 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]",
-          active: "bg-gradient-to-r from-[#0056D2] to-cyan-500 shadow-lg shadow-cyan-200/70",
+          wrapper: "border border-cyan-100 bg-white/90 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]",
+          active:
+            "bg-gradient-to-r from-[#0056D2] to-cyan-500 shadow-md shadow-cyan-200/60 ring-2 ring-white/90",
           activeText: "text-white",
           idleText: "text-slate-500 hover:text-slate-900",
         }
       : {
-          wrapper: "border border-slate-200 bg-slate-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]",
-          active: "bg-white shadow-md",
+          wrapper: "border border-slate-200 bg-slate-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.85)]",
+          active: "bg-white shadow-sm ring-1 ring-white/90",
           activeText: "text-[#0056D2]",
           idleText: "text-slate-500 hover:text-slate-800",
         };
 
   const sizeClasses =
     size === "sm"
-      ? "px-2.5 py-1.5 text-[10px] tracking-[0.12em]"
-      : "px-3 py-1.5 text-[11px] tracking-wide";
+      ? "min-h-8 px-2.5 py-1.5 text-[10px] tracking-[0.12em]"
+      : "min-h-9 px-3 py-1.5 text-[11px] tracking-wide";
 
   return (
     <div
       className={`${
         layout === "fill" ? "flex w-full" : "inline-flex"
-      } overflow-hidden rounded-full p-1 ${tones.wrapper} ${className}`.trim()}
+      } items-center gap-1 rounded-full p-1.5 ${tones.wrapper} ${className}`.trim()}
     >
       {options.map((option) => {
         const active = option.value === value;
@@ -62,11 +63,11 @@ export default function SegmentedToggle({
             key={option.value}
             type="button"
             onClick={() => onChange(option.value)}
-            whileHover={{ y: -1, scale: 1.03 }}
-            whileTap={{ scale: 0.97 }}
+            whileHover={{ y: -1 }}
+            whileTap={{ scale: 0.985 }}
             transition={{ type: "spring", stiffness: 420, damping: 26 }}
-            className={`relative ${layout === "fill" ? "min-w-0 flex-1" : ""} cursor-pointer select-none whitespace-nowrap rounded-full font-black uppercase outline-none transition-all duration-300 ${sizeClasses} ${
-              active ? "hover:brightness-105" : "hover:-translate-y-0.5 hover:shadow-sm"
+            className={`relative inline-flex items-center justify-center ${layout === "fill" ? "min-w-0 flex-1" : ""} cursor-pointer select-none whitespace-nowrap rounded-full font-black uppercase outline-none transition-all duration-300 ${sizeClasses} ${
+              active ? "hover:brightness-105" : "hover:shadow-sm"
             }`}
           >
             {active && (

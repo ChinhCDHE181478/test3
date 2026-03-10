@@ -92,6 +92,14 @@ function FeatureList({
   );
 }
 
+function FloatingBadge({ label }: { label: string }) {
+  return (
+    <div className="absolute -top-4 left-1/2 z-20 -translate-x-1/2 rounded-full bg-gradient-to-r from-blue-600 to-cyan-500 px-4 py-1 text-xs font-black uppercase tracking-wider text-white shadow-md">
+      {label}
+    </div>
+  );
+}
+
 export default function PricingSection() {
   const router = useRouter();
   const [loadingPkg, setLoadingPkg] = useState<string | null>(null);
@@ -217,7 +225,9 @@ export default function PricingSection() {
           </div>
 
           {/* Card 2: Ngắn hạn */}
-          <div className="flex h-full min-h-[500px] flex-col rounded-[2rem] border border-cyan-200 bg-white p-8 shadow-xl shadow-slate-200/50 xl:h-[95%]">
+          <div className="relative flex h-full min-h-[500px] flex-col rounded-[2rem] border border-cyan-200 bg-white p-8 pt-10 shadow-xl shadow-slate-200/50 xl:h-[95%]">
+            {activeShortPlan.badge && <FloatingBadge label={activeShortPlan.badge} />}
+
             <div className="mb-6 flex items-start justify-between gap-4">
               <div>
                 <p className="text-[11px] font-black uppercase tracking-[0.2em] text-cyan-600">Linh hoạt</p>
@@ -246,13 +256,6 @@ export default function PricingSection() {
                 </span>
                 <span className="text-sm font-semibold text-slate-400">{activeShortPlan.periodLabel}</span>
               </div>
-              {activeShortPlan.badge && (
-                <div className="mt-3">
-                  <span className="inline-flex rounded-full bg-cyan-100 px-3 py-1 text-[11px] font-black uppercase tracking-[0.16em] text-cyan-700">
-                    {activeShortPlan.badge}
-                  </span>
-                </div>
-              )}
               <p className="mt-2 text-sm text-slate-500 h-10">{activeShortPlan.description}</p>
             </div>
 
@@ -280,9 +283,10 @@ export default function PricingSection() {
           </div>
 
           {/* Card 3: Dài hạn (Hero Card - Scale lên một chút) */}
-          <div className="relative flex h-full min-h-[500px] flex-col rounded-[2rem] border-2 border-blue-500 bg-gradient-to-b from-blue-50 to-white p-8 shadow-2xl shadow-blue-500/20 xl:scale-105 z-10">
+          <div className="relative z-10 flex h-full min-h-[500px] flex-col rounded-[2rem] border-2 border-blue-500 bg-gradient-to-b from-blue-50 to-white p-8 pt-10 shadow-2xl shadow-blue-500/20 xl:scale-105">
+            {activeLongPlan.badge && <FloatingBadge label={activeLongPlan.badge} />}
             {/* Badge nổi bật */}
-            <div className="absolute -top-4 left-0 right-0 mx-auto w-max rounded-full bg-gradient-to-r from-blue-600 to-cyan-500 px-4 py-1 text-xs font-black uppercase tracking-wider text-white shadow-md">
+            <div className="hidden">
               Tiết kiệm nhất
             </div>
 

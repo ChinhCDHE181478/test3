@@ -122,12 +122,16 @@ function sortConversationHistory(items: any[]) {
 type SubStatus = {
   active: boolean;
   packageCode?: string | null;
+  remainingDays?: number;
+  expiredAt?: string | null;
   raw?: any;
 };
 
 type SubscriptionCheckResult = {
   active: boolean;
   packageCode: string | null;
+  remainingDays: number;
+  expiredAt: string | null;
   error?: boolean;
 };
 
@@ -144,6 +148,25 @@ function formatVND(n: number) {
   } catch {
     return `${n}Đ`;
   }
+}
+
+function toTimestamp(value?: string | null) {
+  if (!value) return 0;
+  const ts = new Date(value).getTime();
+  return Number.isFinite(ts) ? ts : 0;
+}
+
+function hasSubscriptionAdvanced(previous: SubscriptionCheckResult, next: SubscriptionCheckResult) {
+  if (!previous.active && next.active) return true;
+  if (next.remainingDays > previous.remainingDays) return true;
+  return toTimestamp(next.expiredAt) > toTimestamp(previous.expiredAt);
+}
+
+function formatSubscriptionExpiry(value?: string | null) {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toLocaleDateString("vi-VN");
 }
 
 function getTokenFromStorage() {
@@ -191,6 +214,21 @@ function getStoredUserId(): string | null {
   } catch {
     return null;
   }
+}
+
+function resolveClientUserId(fallback?: string | number | null): string | null {
+  const normalizedFallback = normalizePositiveId(fallback);
+  const storedUserId = getStoredUserId();
+  if (storedUserId) return storedUserId;
+
+  const token = getTokenFromStorage();
+  if (token) {
+    const payload = decodeJwtPayload(token);
+    const tokenUserId = extractUserIdFromPayload(payload);
+    if (tokenUserId) return tokenUserId;
+  }
+
+  return normalizedFallback;
 }
 
 async function fetchJsonSafe(url: string, options?: RequestInit) {
@@ -283,14 +321,16 @@ function VivuplanPremiumContent() {
 
   const [showLoginGate, setShowLoginGate] = useState(false);
   const [allowGuestDemo, setAllowGuestDemo] = useState(false);
-  const [subStatus, setSubStatus] = useState<SubStatus>({ active: false, packageCode: null });
+  const [subStatus, setSubStatus] = useState<SubStatus>({ active: false, packageCode: null, remainingDays: 0, expiredAt: null });
   const [showPaywall, setShowPaywall] = useState(false);
   const [isPurchasing, setIsPurchasing] = useState(false);
+  const [isPaymentSyncing, setIsPaymentSyncing] = useState(false);
   const [selectedShortPackage, setSelectedShortPackage] = useState<string>("month");
   const [selectedLongPackage, setSelectedLongPackage] = useState<string>("year");
   const [isAccessCheckLoading, setIsAccessCheckLoading] = useState(true);
   const [isSubStatusResolved, setIsSubStatusResolved] = useState(false);
   const [subStatusError, setSubStatusError] = useState<string | null>(null);
+  const paymentSyncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const promptTutorialStorageKey = useMemo(
     () => `${PROMPT_TUTORIAL_STORAGE_KEY}:${user?.id ? String(user.id) : "guest"}`,
     [user?.id]
@@ -388,6 +428,13 @@ function VivuplanPremiumContent() {
     LONG_TERM_SUBSCRIPTION_PLANS.find((plan) => plan.packageCode === selectedLongPackage) ??
     LONG_TERM_SUBSCRIPTION_PLANS[0];
 
+  const clearPaymentSyncTimer = () => {
+    if (paymentSyncTimerRef.current !== null) {
+      clearTimeout(paymentSyncTimerRef.current);
+      paymentSyncTimerRef.current = null;
+    }
+  };
+
   // VÁ LỖI HIỂN THỊ "NỘI DUNG BỊ KHÓA"
   const shouldLockContent = useMemo(() => {
     if (isAccessCheckLoading) return false;
@@ -446,12 +493,12 @@ function VivuplanPremiumContent() {
   };
 
   const fetchSubscriptionStatus = async (): Promise<SubscriptionCheckResult> => {
-    const uid = user?.id;
+    const uid = resolveClientUserId(user?.id);
     if (!uid) {
-      setSubStatus({ active: false, packageCode: null });
+      setSubStatus({ active: false, packageCode: null, remainingDays: 0, expiredAt: null });
       setSubStatusError(null);
       setIsSubStatusResolved(true);
-      return { active: false, packageCode: null };
+      return { active: false, packageCode: null, remainingDays: 0, expiredAt: null };
     }
 
     setSubStatusError(null);
@@ -461,22 +508,29 @@ function VivuplanPremiumContent() {
       if (!res.ok) {
         setSubStatusError(`HTTP_${res.status}`);
         setIsSubStatusResolved(true);
-        return { active: false, packageCode: null, error: true };
+        return { active: false, packageCode: null, remainingDays: 0, expiredAt: null, error: true };
       }
       const data = json ?? {};
       const result = data?.result ?? data;
       const active = Boolean(result?.active) || Boolean(result?.isActive) || String(result?.status || "").toLowerCase() === "active" || Boolean(result?.valid);
       const packageCode = result?.packageCode ?? result?.package_code ?? result?.plan ?? null;
-      console.log("✅ Subscription status:", { active, packageCode, result });
-      setSubStatus({ active, packageCode, raw: data });
+      const remainingDaysRaw = Number(result?.remainingDays ?? result?.remaining_days ?? 0);
+      const remainingDays = Number.isFinite(remainingDaysRaw) ? remainingDaysRaw : 0;
+      const expiredAt = typeof result?.expiredAt === "string"
+        ? result.expiredAt
+        : typeof result?.expired_at === "string"
+          ? result.expired_at
+          : null;
+      console.log("✅ Subscription status:", { active, packageCode, remainingDays, expiredAt, result });
+      setSubStatus({ active, packageCode, remainingDays, expiredAt, raw: data });
       setSubStatusError(null);
       setIsSubStatusResolved(true);
-      return { active, packageCode };
+      return { active, packageCode, remainingDays, expiredAt };
     } catch (err) {
       console.error("❌ Subscription error:", err);
       setSubStatusError("NETWORK_ERROR");
       setIsSubStatusResolved(true);
-      return { active: false, packageCode: null, error: true };
+      return { active: false, packageCode: null, remainingDays: 0, expiredAt: null, error: true };
     }
   };
 
@@ -485,8 +539,30 @@ function VivuplanPremiumContent() {
     if (next.active) setShowPaywall(false);
   };
 
+  const scheduleSubscriptionSync = (baseline: SubscriptionCheckResult, attempt = 0) => {
+    clearPaymentSyncTimer();
+
+    if (attempt >= 18) {
+      setIsPaymentSyncing(false);
+      return;
+    }
+
+    setIsPaymentSyncing(true);
+    paymentSyncTimerRef.current = setTimeout(async () => {
+      const next = await fetchSubscriptionStatus();
+      if (!next.error && hasSubscriptionAdvanced(baseline, next)) {
+        setShowPaywall(false);
+        setIsPaymentSyncing(false);
+        clearPaymentSyncTimer();
+        return;
+      }
+
+      scheduleSubscriptionSync(baseline, attempt + 1);
+    }, attempt === 0 ? 2500 : 5000);
+  };
+
   const purchaseSubscription = async (packageCode: string) => {
-    const uid = user?.id;
+    const uid = resolveClientUserId(user?.id);
     if (!uid) { setShowLoginGate(true); return; }
     setIsPurchasing(true);
     try {
@@ -496,7 +572,14 @@ function VivuplanPremiumContent() {
       });
       if (!res.ok) { alert("Lỗi tạo giao dịch. Vui lòng thử lại."); return; }
       if (json?.status !== "success" || !json?.result?.checkoutUrl) { alert(json?.message || "Không lấy được link thanh toán."); return; }
+      const baseline: SubscriptionCheckResult = {
+        active: Boolean(subStatus.active),
+        packageCode: subStatus.packageCode ?? null,
+        remainingDays: Number(subStatus.remainingDays ?? 0),
+        expiredAt: subStatus.expiredAt ?? null,
+      };
       window.open(json.result.checkoutUrl, "_blank");
+      scheduleSubscriptionSync(baseline);
     } catch { alert("Lỗi kết nối."); } finally { setIsPurchasing(false); }
   };
 
@@ -792,7 +875,7 @@ function VivuplanPremiumContent() {
         await Promise.all([loadHistory(), fetchSubscriptionStatus()]);
       } else {
         setChatHistory([]);
-        setSubStatus({ active: false, packageCode: null });
+        setSubStatus({ active: false, packageCode: null, remainingDays: 0, expiredAt: null });
         setIsSubStatusResolved(true);
       }
       if (!cancelled) setIsAccessCheckLoading(false);
@@ -816,6 +899,36 @@ function VivuplanPremiumContent() {
       setShowPaywall(false);
     }
   }, [subStatus.active]);
+
+  useEffect(() => {
+    if (!mounted || isAuthLoading || !isAuthenticated || !user?.id) return;
+
+    const refreshSubscriptionStatus = () => {
+      void fetchSubscriptionStatus();
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        refreshSubscriptionStatus();
+      }
+    };
+
+    window.addEventListener("focus", refreshSubscriptionStatus);
+    window.addEventListener("pageshow", refreshSubscriptionStatus);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      window.removeEventListener("focus", refreshSubscriptionStatus);
+      window.removeEventListener("pageshow", refreshSubscriptionStatus);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [mounted, isAuthLoading, isAuthenticated, user?.id]);
+
+  useEffect(() => {
+    return () => {
+      clearPaymentSyncTimer();
+    };
+  }, []);
 
   useEffect(() => {
     if (!mounted || isAuthLoading || isAccessCheckLoading) return;
@@ -925,9 +1038,11 @@ function VivuplanPremiumContent() {
                 <Lock size={26} className="hidden md:block" />
               </div>
               <h3 className="text-[15px] font-black leading-[1.2] tracking-tight text-slate-900 md:text-[22px]">Mở khóa toàn bộ VivuPlan</h3>
-              <p className="mt-1.5 text-[12px] font-medium leading-relaxed text-slate-500 md:mt-3 md:text-[13px]">
-                {subStatus.active ? `Đang kích hoạt: ${getSubscriptionDisplayName(subStatus.packageCode, "Premium")}` : "Bạn đang dùng bản miễn phí giới hạn."}
-              </p>
+                <p className="mt-1.5 text-[12px] font-medium leading-relaxed text-slate-500 md:mt-3 md:text-[13px]">
+                  {subStatus.active
+                    ? `Đang kích hoạt: ${getSubscriptionDisplayName(subStatus.packageCode, "Premium")}${subStatus.remainingDays ? `. Còn ${subStatus.remainingDays} ngày` : ""}${formatSubscriptionExpiry(subStatus.expiredAt) ? `, đến ${formatSubscriptionExpiry(subStatus.expiredAt)}` : ""}.`
+                    : "Bạn đang dùng bản miễn phí giới hạn."}
+                </p>
             </div>
 
             <div className="grid gap-2 md:gap-3">
@@ -1028,7 +1143,7 @@ function VivuplanPremiumContent() {
             </div>
             <div className="mt-4 border-t border-slate-100 pt-4 md:mt-7 md:pt-7">
               {!isAuthenticated && <div className="flex items-center justify-between gap-2 mb-3 bg-amber-50 p-2 rounded-lg text-amber-700 text-xs font-bold border border-amber-100"><span>⚠️ Cần đăng nhập để mua</span><button onClick={() => router.push("/pages/login")} className="underline uppercase text-[10px] hover:text-amber-900 transition-colors">Đăng nhập</button></div>}
-              {isPurchasing ? <button disabled className="w-full py-3 rounded-xl bg-slate-100 text-slate-400 font-bold flex items-center justify-center gap-2 cursor-not-allowed"><Loader2 size={16} className="animate-spin" /> Đang xử lý...</button> : <button onClick={handleCheckPaymentStatus} disabled={!isAuthenticated} className="w-full py-3 rounded-xl border border-slate-200 text-slate-600 text-xs font-bold uppercase tracking-wide hover:bg-slate-50 disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer disabled:cursor-not-allowed md:text-[13px]"><CreditCard size={14} /> Kiểm tra thanh toán</button>}
+              {isPurchasing ? <button disabled className="w-full py-3 rounded-xl bg-slate-100 text-slate-400 font-bold flex items-center justify-center gap-2 cursor-not-allowed"><Loader2 size={16} className="animate-spin" /> Đang xử lý...</button> : <button onClick={handleCheckPaymentStatus} disabled={!isAuthenticated || isPaymentSyncing} className="w-full py-3 rounded-xl border border-slate-200 text-slate-600 text-xs font-bold uppercase tracking-wide hover:bg-slate-50 disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer disabled:cursor-not-allowed md:text-[13px]">{isPaymentSyncing ? <><Loader2 size={14} className="animate-spin" /> Đang đồng bộ thanh toán...</> : <><CreditCard size={14} /> Kiểm tra thanh toán</>}</button>}
               <p className="mt-3 text-center text-[10px] font-medium text-slate-400 md:text-[11px]">* Thanh toán an toàn qua cổng PayOS / VNPay.</p>
             </div>
           </div>

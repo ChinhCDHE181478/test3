@@ -77,6 +77,12 @@ const normalizePaymentStatus = (value: any): "SUCCESS" | "FAILED" | "PENDING" =>
   return "FAILED";
 };
 
+const paymentStatusLabel: Record<PaymentRecord["status"], string> = {
+  SUCCESS: "Thành Công",
+  PENDING: "Đang xử lý",
+  FAILED: "Thất Bại",
+};
+
 const normalizeSubscriptionResult = (payload: any): SubscriptionResult | null => {
   const raw = payload?.result ?? payload?.data ?? payload;
   if (!raw || typeof raw !== "object") return null;
@@ -436,7 +442,7 @@ function SubscriptionPanel({ userId }: { userId: number }) {
                         p.status === "PENDING" ? "bg-amber-100 text-amber-700" :
                           "bg-red-100 text-red-700"
                         }`}>
-                        {p.status}
+                        {paymentStatusLabel[p.status]}
                       </span>
                     </td>
                   </tr>
