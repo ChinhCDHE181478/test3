@@ -42,13 +42,20 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
+  // Helper để tạo redirect URL chính xác (tránh lỗi localhost khi deploy qua Nginx)
+  const getRedirectUrl = (path: string) => {
+    const host = request.headers.get("host") || request.nextUrl.host;
+    const protocol = request.headers.get("x-forwarded-proto") || "http";
+    return new URL(path, `${protocol}://${host}`);
+  };
+
   const refreshToken = request.cookies.get("refresh_token")?.value;
   let accessToken = request.cookies.get("access_token")?.value;
 
   // 2. Kiểm tra nếu chưa đăng nhập (không có refresh token)
   if (!refreshToken) {
     if (userPaths.includes(pathname) || adminPaths.some(path => pathname.startsWith(path))) {
-      return NextResponse.redirect(new URL("/pages/login", request.url));
+      return NextResponse.redirect(getRedirectUrl("/pages/login"));
     }
     return NextResponse.next();
   }
@@ -117,7 +124,7 @@ export async function middleware(request: NextRequest) {
       } else {
         // Refresh thất bại -> Redirect login nếu vào trang cần quyền
         if (userPaths.includes(pathname) || adminPaths.some(path => pathname.startsWith(path))) {
-          const loginRedirect = NextResponse.redirect(new URL("/pages/login", request.url));
+          const loginRedirect = NextResponse.redirect(getRedirectUrl("/pages/login"));
           // Xóa cookie cũ để tránh loop
           loginRedirect.cookies.delete("access_token");
           loginRedirect.cookies.delete("refresh_token");
@@ -127,7 +134,7 @@ export async function middleware(request: NextRequest) {
     } catch (error) {
       console.error("Middleware refresh error:", error);
       if (userPaths.includes(pathname) || adminPaths.some(path => pathname.startsWith(path))) {
-        return NextResponse.redirect(new URL("/pages/login", request.url));
+        return NextResponse.redirect(getRedirectUrl("/pages/login"));
       }
     }
   }
@@ -138,7 +145,7 @@ export async function middleware(request: NextRequest) {
       // Redirect về trang chủ nếu không phải admin
       // Cần return response đã có cookie mới (nếu có refresh)
       // Nhưng NextResponse.redirect tạo response mới, nên phải copy cookie sang
-      const homeRedirect = NextResponse.redirect(new URL("/", request.url));
+      const homeRedirect = NextResponse.redirect(getRedirectUrl("/"));
 
       // Copy cookies từ response (nếu đã refresh) sang redirect response
       response.cookies.getAll().forEach((cookie) => {
@@ -151,7 +158,7 @@ export async function middleware(request: NextRequest) {
 
   // 5. Đã login mà vào trang login -> Redirect Home
   if (onlyPublicPaths.includes(pathname)) {
-    const homeRedirect = NextResponse.redirect(new URL("/", request.url));
+    const homeRedirect = NextResponse.redirect(getRedirectUrl("/"));
     // Copy cookies từ response (nếu đã refresh) sang redirect response
     response.cookies.getAll().forEach((cookie) => {
       homeRedirect.cookies.set(cookie.name, cookie.value, cookie);
